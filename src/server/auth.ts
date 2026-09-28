@@ -3,6 +3,7 @@ import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { and, eq, ne, sql } from 'drizzle-orm';
 import { withAnonymous, withContext } from '@/db/context';
+import { ensureFirstOwner } from '@/db/first-run';
 import { sessions, users } from '@/db/schema';
 import { decryptJson, encryptJson, randomToken, sha256 } from '@/lib/crypto';
 import { hashPassword, verifyPassword } from '@/lib/auth/password';
@@ -51,6 +52,7 @@ export async function login(email: string, password: string): Promise<LoginResul
   const { ip } = await requestMeta();
   // Brute-force brake: 8 tries per 10 minutes per email+IP.
   if (rateLimited(`login|${email.toLowerCase()}|${ip ?? 'local'}`, 8, 10 * 60_000)) return { ok: false, error: 'Too many attempts. Try again in 10 minutes.' };
+  await ensureFirstOwner();
   const found = await withAnonymous(async (tx) =>
     (await tx.execute<{ id: string; password_hash: string; mfa_enabled: boolean }>(sql`select * from app.auth_find_user(${email})`)).rows[0]);
   // Always run a hash comparison so response time doesn't reveal whether the email exists.

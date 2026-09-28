@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { asc, eq, sql } from 'drizzle-orm';
 import { db, type Tx } from '@/db/client';
 import { applyContext, withContext } from '@/db/context';
+import { ensureRuntimeLogin } from '@/db/connection';
 import { accountMembers, accounts, publicUserColumns, subAccounts, users, type AccountSettings } from '@/db/schema';
 import { isModuleEnabled, MODULES, type ModuleKey } from '@/lib/modules/registry';
 import { grantAllows, PERMISSION_LABELS, type Grant, type Permission } from '@/lib/permissions';
@@ -139,6 +140,7 @@ export async function inBusiness<T>(
   if (!id) throw new ValidationError('Choose a business first.');
   if (!ctx.businesses.some((b) => b.id === id)) throw new ForbiddenError('You do not have access to that business.');
   const perms = Array.isArray(perm) ? perm : [perm];
+  await ensureRuntimeLogin();
   return db().transaction(async (tx) => {
     await applyContext(tx, { actor: 'user', userId: ctx.user.id, subAccountIds: [id], ip: ctx.ip });
     for (const p of perms) {

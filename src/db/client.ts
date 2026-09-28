@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
-import { env } from '@/lib/env';
+import { appDatabaseUrl, onManagedDatabase } from './connection';
 import * as schema from './schema';
 
 // int8 + numeric aggregates come back as strings by default. Our values (cents, counts)
@@ -14,7 +14,9 @@ const g = globalThis as unknown as Globals;
 /** Pool for the runtime role (`bos_app`). Every query through it is subject to row level security. */
 export function appPool(): pg.Pool {
   if (!g.__bosPool) {
-    g.__bosPool = new pg.Pool({ connectionString: env().DATABASE_URL, max: Number(process.env.DB_POOL_MAX ?? 10) });
+    // Serverless instances are many and short-lived: keep each one's pool small.
+    const max = Number(process.env.DB_POOL_MAX ?? (onManagedDatabase() ? 3 : 10));
+    g.__bosPool = new pg.Pool({ connectionString: appDatabaseUrl(), max, idleTimeoutMillis: 10_000 });
   }
   return g.__bosPool;
 }

@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { db, type Tx } from './client';
+import { ensureRuntimeLogin } from './connection';
 
 /**
  * Database context for one unit of work. Everything that touches business data
@@ -49,6 +50,7 @@ export async function applyContext(tx: Tx, ctx: DbContext) {
 }
 
 export async function withContext<T>(ctx: DbContext, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  await ensureRuntimeLogin();
   return db().transaction(async (tx) => {
     await applyContext(tx, ctx);
     return fn(tx);

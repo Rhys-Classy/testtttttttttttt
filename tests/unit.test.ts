@@ -199,3 +199,36 @@ describe('message delivery retries', () => {
     expect(isPermanentFailure('Invalid login: 535 Authentication failed')).toBe(true);
   });
 });
+
+describe('hosting', () => {
+  it('Netlify Database migrations match drizzle/ (run `npm run netlify:migrations` after generating)', async () => {
+    const { readFileSync, readdirSync } = await import('node:fs');
+    const journal = JSON.parse(readFileSync('drizzle/meta/_journal.json', 'utf8')) as { entries: { tag: string }[] };
+    const dirs = readdirSync('netlify/database/migrations').sort();
+    expect(dirs).toEqual(journal.entries.map((e) => { const [n, ...r] = e.tag.split('_'); return `${n}_${r.join('-')}`; }));
+    for (const e of journal.entries) {
+      const [n, ...r] = e.tag.split('_');
+      const netlify = readFileSync(`netlify/database/migrations/${n}_${r.join('-')}/migration.sql`, 'utf8');
+      expect(netlify.endsWith(readFileSync(`drizzle/${e.tag}.sql`, 'utf8'))).toBe(true);
+    }
+  });
+
+  it('derives the restricted runtime login from the managed database URL', async () => {
+    const saved = { ...process.env };
+    try {
+      delete process.env.DATABASE_URL;
+      process.env.NETLIFY_DB_URL = 'postgres://owner:ownerpw@db.example.com:5432/app?sslmode=require';
+      process.env.APP_DB_PASSWORD = 'x'.repeat(32);
+      const { appDatabaseUrl, onManagedDatabase, ownerDatabaseUrl } = await import('@/db/connection');
+      expect(onManagedDatabase()).toBe(true);
+      const u = new URL(appDatabaseUrl());
+      expect([u.username, u.password, u.hostname, u.pathname, u.searchParams.get('sslmode')]).toEqual(['bos_app', 'x'.repeat(32), 'db.example.com', '/app', 'require']);
+      delete process.env.DATABASE_ADMIN_URL;
+      expect(ownerDatabaseUrl()).toContain('owner:ownerpw@');
+      process.env.APP_DB_PASSWORD = 'short';
+      expect(() => appDatabaseUrl()).toThrow(/APP_DB_PASSWORD/);
+    } finally {
+      process.env = saved;
+    }
+  });
+});

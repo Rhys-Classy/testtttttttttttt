@@ -1,11 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 /** Reachable without a session: login, customer-facing links, provider webhooks, the token-authenticated API. */
-const PUBLIC = [/^\/login/, /^\/i\//, /^\/q\//, /^\/f\//, /^\/p\//, /^\/api\/webhooks\//, /^\/api\/v1(\/|$)/, /^\/api\/health/];
+const PUBLIC = [/^\/login/, /^\/i\//, /^\/q\//, /^\/f\//, /^\/p\//, /^\/api\/webhooks\//, /^\/api\/v1(\/|$)/, /^\/api\/health/, /^\/api\/cron\//];
 /** Pages other sites may embed in an iframe (enquiry forms). */
 const EMBEDDABLE = /^\/f\//;
 /** Cookie-authenticated endpoints that change things must come from our own pages (CSRF). */
-const NEEDS_SAME_ORIGIN = (path: string) => path.startsWith('/api/') && !path.startsWith('/api/webhooks/') && !/^\/api\/v1(\/|$)/.test(path);
+const NEEDS_SAME_ORIGIN = (path: string) => path.startsWith('/api/') && !path.startsWith('/api/webhooks/') && !path.startsWith('/api/cron/') && !/^\/api\/v1(\/|$)/.test(path);
 
 function contentSecurityPolicy(nonce: string, path: string, isDev: boolean, https: boolean) {
   return [
@@ -15,6 +15,8 @@ function contentSecurityPolicy(nonce: string, path: string, isDev: boolean, http
     `img-src 'self' data: blob: https:`,
     `font-src 'self' data:`,
     `connect-src 'self'${isDev ? ' ws: wss:' : ''}`,
+    `worker-src 'self'`,
+    `manifest-src 'self'`,
     `frame-src 'self'`,
     `frame-ancestors ${EMBEDDABLE.test(path) ? '*' : "'none'"}`,
     `form-action 'self' https://checkout.stripe.com`,
@@ -69,5 +71,6 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|manifest.webmanifest|robots.txt).*)'],
+  // Static files for the installable app (icons, manifest, service worker, offline page) skip the proxy.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|manifest.webmanifest|sw.js|offline.html|robots.txt).*)'],
 };

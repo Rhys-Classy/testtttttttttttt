@@ -1,9 +1,9 @@
-import 'dotenv/config';
 import pg from 'pg';
 import { eq } from 'drizzle-orm';
 import { bootstrapOwner } from './bootstrap';
 import { closeDb } from './client';
 import { withContext } from './context';
+import { ownerDatabaseUrl } from './connection';
 import { subAccounts } from './schema';
 import { createBusiness, installBusinessDefaults, type BusinessInput } from '@/server/services/businesses';
 import type { Scope } from '@/server/services/_common';
@@ -61,8 +61,8 @@ export const STARTER_BUSINESSES: (BusinessInput & { customFields: Parameters<typ
   },
 ];
 
-export async function seed(opts: { demo?: boolean } = {}) {
-  const adminUrl = process.env.DATABASE_ADMIN_URL;
+export async function seed(opts: { demo?: boolean; adminUrl?: string } = {}) {
+  const adminUrl = opts.adminUrl ?? ownerDatabaseUrl();
   if (!adminUrl) throw new Error('DATABASE_ADMIN_URL is required to seed');
   const email = process.env.SEED_OWNER_EMAIL ?? 'owner@example.com';
   const password = process.env.SEED_OWNER_PASSWORD ?? 'change-me-now';
@@ -97,8 +97,10 @@ export async function seed(opts: { demo?: boolean } = {}) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
+  // CLI only: read .env (settings are read lazily, so loading it here is early enough).
   const demo = process.argv.includes('--demo') || process.env.SEED_DEMO === '1';
-  seed({ demo })
+  import('dotenv')
+    .then((d) => { d.config(); return seed({ demo }); })
     .then(async (r) => {
       console.log(`Owner login: ${r.email} / ${r.password}`);
       console.log(r.created.length ? `Created: ${r.created.join(', ')}` : 'Businesses already exist');

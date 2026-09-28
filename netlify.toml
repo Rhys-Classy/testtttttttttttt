@@ -1,0 +1,13 @@
+# Netlify: Next.js app + Netlify Database (Postgres) + Blobs (uploads) + a scheduled worker.
+# Database migrations live in netlify/database/migrations (generated from drizzle/ by
+# `npm run netlify:migrations`) and are applied by Netlify before each deploy goes live.
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NEXT_TELEMETRY_DISABLED = "1"
+
+[functions]
+  directory = "netlify/functions"

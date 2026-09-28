@@ -18,10 +18,13 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:reset": "tsx src/db/reset.ts && npm run db:migrate && npm run db:seed",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "netlify:migrations": "node scripts/netlify-migrations.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
+    "@netlify/blobs": "^11.1.1",
+    "@netlify/database": "^2.0.1",
     "chrono-node": "^2.10.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -38,6 +41,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@netlify/functions": "^6.0.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.20.4",
     "@types/nodemailer": "^8.0.2",
