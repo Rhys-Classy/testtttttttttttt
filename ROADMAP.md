@@ -53,7 +53,9 @@ Columns: UI · backend · database · validation · permissions · error handlin
 - Password reset by email (owners reset team passwords by re-inviting; the owner's own reset is `npm run db:seed` with new `SEED_OWNER_PASSWORD`)
 - Invites by email link (currently a temporary password the owner shares)
 - WebAuthn / passkeys (TOTP is in)
-- Shared rate-limit store (Redis) for multi-server deployments — the in-memory limiter is per process
+- Shared rate-limit store (Redis/Blobs) — the in-memory limiter is per server instance, which on Netlify means per function instance (weaker)
+- Instant email/SMS sending on Netlify: messages go out on the next 2-minute worker run (self-host: within seconds)
+- Push notifications on the installed phone app
 - API: create/send invoices, record payments, webhooks out (subscriptions)
 - AI: scheduled summaries, suggested tasks, cross-business weekly briefing
 - Field-level permissions (e.g. hide cost prices from Staff) — permissions are per module/action today

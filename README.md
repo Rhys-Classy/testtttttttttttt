@@ -110,6 +110,27 @@ Put it behind HTTPS (Caddy, Cloudflare Tunnel, nginx). `APP_URL` must be the pub
 
 ---
 
+## Host on Netlify (and install on your phone)
+
+`netlify.toml` is included. Netlify builds the Next.js app, provisions **Netlify Database** (Postgres) automatically, applies `netlify/database/migrations` before each deploy goes live, stores uploads in **Netlify Blobs**, and runs the background jobs with a scheduled function (`netlify/functions/worker-tick.mts`, every 2 minutes).
+
+Environment variables (Project configuration → Environment variables):
+
+| Variable | Value |
+|---|---|
+| `APP_URL` | `https://<site>.netlify.app` (or your domain) |
+| `ENCRYPTION_KEY` | 48+ random characters (secret) — never change it once integrations are connected |
+| `APP_DB_PASSWORD` | 30+ random characters (secret) — the app's restricted database login |
+| `CRON_SECRET` | 32+ random characters (secret) |
+| `SEED_OWNER_EMAIL`, `SEED_OWNER_PASSWORD`, `SEED_OWNER_NAME` | first login, created on the first sign-in attempt while the database is empty |
+| `STORAGE_DRIVER` | `netlify-blobs` |
+
+How the database stays locked down on Netlify: the platform gives the app the database owner's connection. The app uses it only to switch on its own restricted `bos_app` login (first request after a deploy) and to create the first owner on an empty database; every page and API request then runs as `bos_app`, so row level security applies exactly as on a self-hosted server.
+
+After changing `drizzle/` run `npm run netlify:migrations` (a test fails if the two drift).
+
+**Install on a phone:** open the site → iPhone: Safari → Share → *Add to Home Screen*; Android: Chrome → ⋮ → *Install app*. It opens full screen with its own icon; if you're offline it shows a calm offline screen (pages are never cached on the phone).
+
 ## Connecting each business
 
 *Settings → Integrations* (open the business first — each one has its own Stripe, email, SMS and website-form connection; the AI key is account-wide). Step-by-step setup and what's built vs planned: **INTEGRATIONS.md**.

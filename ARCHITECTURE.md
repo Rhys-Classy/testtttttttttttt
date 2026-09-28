@@ -33,6 +33,17 @@ Business OS is one Next.js app + one background worker + one PostgreSQL database
 └─────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+## Hosting options
+
+| | Self-host (Docker) | Netlify |
+|---|---|---|
+| App | Next.js standalone server | Netlify Next.js runtime (functions) |
+| Database | your Postgres; `DATABASE_URL` = `bos_app`, `DATABASE_ADMIN_URL` = owner | Netlify Database; `bos_app` login derived from the platform connection + `APP_DB_PASSWORD` (`src/db/connection.ts`) |
+| Migrations | `npm run db:migrate` | `netlify/database/migrations`, applied by Netlify before publish |
+| Background jobs | `npm run worker` (always on) | scheduled function every 2 min → `/api/cron/worker` (CRON_SECRET) |
+| Uploads | local disk (`STORAGE_DIR`) | Netlify Blobs |
+| Phone app | same PWA (manifest + service worker) | same |
+
 ## Stack and why
 
 | Choice | Why |
