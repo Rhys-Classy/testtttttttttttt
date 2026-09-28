@@ -5,7 +5,7 @@ import { pgArray } from '@/db/sql';
 export type ReportRange = { from: Date; to: Date };
 
 /** Useful numbers only. Always limited to the businesses visible in this request. */
-export async function getReport(tx: Tx, ids: string[], range: ReportRange) {
+export async function getReport(tx: Tx, ids: string[], range: ReportRange, tz = 'Australia/Melbourne') {
   const { from, to } = range;
   const one = async <T extends Record<string, unknown>>(q: ReturnType<typeof sql>) => (await tx.execute<T>(q)).rows[0];
 
@@ -28,10 +28,10 @@ export async function getReport(tx: Tx, ids: string[], range: ReportRange) {
     (select coalesce(sum(total_cents - amount_paid_cents), 0) from invoices where sub_account_id = any(${pgArray(ids)}) and status = 'overdue') as overdue`);
 
   const monthly = (await tx.execute<{ month: string; cents: number }>(sql`
-    select to_char(date_trunc('month', paid_at at time zone 'Australia/Melbourne'), 'YYYY-MM') as month,
+    select to_char(date_trunc('month', paid_at at time zone ${tz}), 'YYYY-MM') as month,
       coalesce(sum(amount_cents - refunded_cents), 0) as cents
     from payments where sub_account_id = any(${pgArray(ids)}) and status in ('succeeded','partially_refunded')
-      and paid_at >= date_trunc('month', now()) - interval '11 months'
+      and paid_at >= (date_trunc('month', now() at time zone ${tz}) - interval '11 months') at time zone ${tz}
     group by 1 order by 1`)).rows;
 
   const bySource = (await tx.execute<{ source: string; leads: number; converted: number }>(sql`

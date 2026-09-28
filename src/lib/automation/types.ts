@@ -123,9 +123,10 @@ export const CONDITION_FIELDS: { field: string; label: string; kind: 'text' | 'n
   { field: 'contact.email', label: 'Contact email', kind: 'text' },
   { field: 'contact.phone', label: 'Contact phone', kind: 'text' },
   { field: 'invoice.total', label: 'Invoice amount ($)', kind: 'number' },
-  { field: 'invoice.status', label: 'Invoice status', kind: 'text' },
+  { field: 'invoice.status', label: 'Invoice status (live)', kind: 'text' },
   { field: 'deal.value', label: 'Deal value ($)', kind: 'number' },
   { field: 'appointment.status', label: 'Appointment status', kind: 'text' },
+  { field: 'quote.status', label: 'Quote status (live)', kind: 'text' },
   { field: 'event.amount', label: 'Event amount ($)', kind: 'number' },
   { field: 'contact.replied', label: 'Contact has replied since start', kind: 'text' },
 ];
@@ -150,7 +151,17 @@ export function describeStep(step: Step): string {
     case 'notify': return `Notify: ${step.config.title}`;
     case 'webhook': return `Webhook → ${step.config.url}`;
     case 'http_request': return `${step.config.method} ${step.config.url}`;
-    case 'condition': return `If ${step.config.conditions.map((c) => `${c.field} ${c.op} ${c.value ?? ''}`.trim()).join(step.config.match === 'all' ? ' and ' : ' or ')}`;
+    case 'condition': return `If ${step.config.conditions.map(describeCondition).join(step.config.match === 'all' ? ' and ' : ' or ')}`;
     case 'stop': return 'Stop';
   }
+}
+
+const OP_WORDS: Record<ConditionOp, string> = {
+  eq: 'is', neq: 'is not', gt: '>', gte: '≥', lt: '<', lte: '≤', contains: 'contains', has_tag: 'has tag', not_has_tag: "doesn't have tag", is_set: 'is set', not_set: 'is empty',
+};
+
+export function describeCondition(c: Condition): string {
+  const field = CONDITION_FIELDS.find((f) => f.field === c.field)?.label ?? c.field.replace(/^custom\./, '');
+  if (c.field === 'contact.replied') return c.value === 'yes' ? 'contact replied' : 'no reply yet';
+  return `${field.toLowerCase()} ${OP_WORDS[c.op]}${c.op === 'is_set' || c.op === 'not_set' ? '' : ` "${c.value ?? ''}"`}`;
 }

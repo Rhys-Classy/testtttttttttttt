@@ -1,6 +1,6 @@
 import { and, eq, gt, inArray, sql } from 'drizzle-orm';
 import type { Tx } from '@/db/client';
-import { appointments, contacts, deals, events, invoices, messages, workflowRuns, workflows } from '@/db/schema';
+import { appointments, contacts, deals, events, invoices, messages, quotes, workflowRuns, workflows } from '@/db/schema';
 import type { Condition, Step, Trigger, WorkflowDefinition } from '@/lib/automation/types';
 import { addDaysKey, formatDateTime, todayKey, zonedTimeToUtc } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
@@ -207,6 +207,7 @@ type RunData = {
   invoice: typeof invoices.$inferSelect | null;
   deal: typeof deals.$inferSelect | null;
   appointment: typeof appointments.$inferSelect | null;
+  quote: typeof quotes.$inferSelect | null;
   event: { type?: string; entityType?: string; entityId?: string; payload?: Record<string, unknown> };
 };
 
@@ -223,7 +224,8 @@ async function loadRunData(tx: Tx, scope: Scope, run: WorkflowRun): Promise<RunD
       .orderBy(sql`${deals.updatedAt} desc`).limit(1))[0] ?? null;
   }
   const appointment = await load('appointment', async (id) => (await tx.select().from(appointments).where(byTenant(appointments, scope, id)))[0]);
-  return { business, contact, invoice, deal, appointment, event };
+  const quote = await load('quote', async (id) => (await tx.select().from(quotes).where(byTenant(quotes, scope, id)))[0]);
+  return { business, contact, invoice, deal, appointment, quote, event };
 }
 
 function templateVars(d: RunData) {
@@ -239,6 +241,7 @@ function templateVars(d: RunData) {
       link: `${process.env.APP_URL ?? ''}/i/${d.invoice.publicToken}`,
     } : {},
     appointment: d.appointment ? { title: d.appointment.title, when: formatDateTime(d.appointment.startsAt, b.timezone) } : {},
+    quote: d.quote ? { number: d.quote.number, total: formatMoney(d.quote.totalCents, d.quote.currency), link: `${process.env.APP_URL ?? ''}/q/${d.quote.publicToken}` } : {},
     deal: d.deal ? { title: d.deal.title, value: formatMoney(d.deal.valueCents, b.currency) } : {},
   };
 }
@@ -251,9 +254,19 @@ async function fieldValue(tx: Tx, scope: Scope, run: WorkflowRun, d: RunData, fi
     case 'contact.email': return d.contact?.email;
     case 'contact.phone': return d.contact?.phone;
     case 'invoice.total': return d.invoice ? d.invoice.totalCents / 100 : undefined;
-    case 'invoice.status': return d.invoice?.status;
+    case 'invoice.status': {
+      if (!d.invoice) return undefined;
+      const [i] = await tx.select({ status: invoices.status }).from(invoices).where(byTenant(invoices, scope, d.invoice.id));
+      return i?.status;
+    }
     case 'deal.value': return d.deal ? d.deal.valueCents / 100 : undefined;
     case 'appointment.status': return d.appointment?.status;
+    case 'quote.status': {
+      if (!d.quote) return undefined;
+      // Re-read: the quote may have been accepted while the run was waiting.
+      const [q] = await tx.select({ status: quotes.status }).from(quotes).where(byTenant(quotes, scope, d.quote.id));
+      return q?.status;
+    }
     case 'event.amount': {
       const p = d.event.payload ?? {};
       const cents = (p.amountCents ?? p.totalCents ?? p.valueCents ?? p.balanceCents) as number | undefined;

@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+/* Calm, low-contrast surfaces with one clear accent. Dark mode follows the OS. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f1f3f6;
+  --border: #e4e7ec;
+  --text: #0f172a;
+  --muted: #64748b;
+  --accent: #4f46e5;
+  --accent-fg: #ffffff;
+  --accent-soft: #eef2ff;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --warn: #b45309;
+  --warn-soft: #fffbeb;
+  --ok: #047857;
+  --ok-soft: #ecfdf5;
+  --ring: #a5b4fc;
+  --chart-1: #4f46e5;
+  --chart-grid: #e4e7ec;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0f17;
+    --surface: #121826;
+    --surface-2: #182033;
+    --border: #243049;
+    --text: #e5e9f2;
+    --muted: #93a0b8;
+    --accent: #818cf8;
+    --accent-fg: #0b0f17;
+    --accent-soft: #1e2345;
+    --danger: #f87171;
+    --danger-soft: #2a1416;
+    --warn: #fbbf24;
+    --warn-soft: #2a2110;
+    --ok: #34d399;
+    --ok-soft: #0f2a22;
+    --ring: #4f46e5;
+    --chart-1: #7c83f5;
+    --chart-grid: #243049;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-grid: var(--chart-grid);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+input, select, textarea {
+  color: var(--text);
+}
+
+dialog::backdrop {
+  background: rgb(15 23 42 / 0.45);
+  backdrop-filter: blur(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }

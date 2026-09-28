@@ -98,7 +98,7 @@ export const PROVIDERS: ProviderDef[] = [
     description: 'Powers the assistant across all businesses. One key for the whole account.',
     fields: [
       { key: 'apiKey', label: 'API key', secret: true, required: true, placeholder: 'sk-ant-…' },
-      { key: 'model', label: 'Model', placeholder: 'claude-opus-5-5' },
+      { key: 'model', label: 'Model', placeholder: 'claude-opus-5' },
     ],
   },
   {

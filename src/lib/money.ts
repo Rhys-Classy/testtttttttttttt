@@ -1,17 +1,25 @@
 const formatters = new Map<string, Intl.NumberFormat>();
 
 export function formatMoney(cents: number | null | undefined, currency = 'AUD', locale = 'en-AU', opts: { compact?: boolean } = {}): string {
-  const key = `${locale}|${currency}|${opts.compact ? 'c' : ''}`;
+  if (opts.compact) return compactMoney(cents ?? 0, currency);
+  const key = `${locale}|${currency}`;
   let f = formatters.get(key);
   if (!f) {
-    f = new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency,
-      ...(opts.compact ? { notation: 'compact', maximumFractionDigits: 1 } : { minimumFractionDigits: 2 }),
-    });
+    f = new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: 2 });
     formatters.set(key, f);
   }
   return f.format((cents ?? 0) / 100);
+}
+
+/** Deterministic short form ($18.5k, $1.2M). Intl compact notation differs between Node and browsers. */
+function compactMoney(cents: number, currency: string): string {
+  const symbol = currency === 'AUD' || currency === 'NZD' || currency === 'USD' ? '$' : `${currency} `;
+  const v = Math.abs(cents) / 100;
+  const sign = cents < 0 ? '-' : '';
+  const trim = (n: number) => (Math.round(n * 10) / 10).toString();
+  if (v >= 1_000_000) return `${sign}${symbol}${trim(v / 1_000_000)}M`;
+  if (v >= 1_000) return `${sign}${symbol}${trim(v / 1_000)}k`;
+  return `${sign}${symbol}${Math.round(v)}`;
 }
 
 /** "$2,500", "2500.50", "2.5k" -> cents. Returns null when it doesn't look like money. */
