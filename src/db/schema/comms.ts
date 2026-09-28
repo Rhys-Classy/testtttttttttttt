@@ -1,6 +1,7 @@
 import { bigserial, boolean, index, integer, jsonb, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { createdAt, pk, ts, updatedAt } from './_shared';
 import { subAccountId } from './tenant';
+import { accounts, subAccounts } from './platform';
 
 export type Channel = 'email' | 'sms' | 'call' | 'chat' | 'facebook' | 'instagram';
 
@@ -24,6 +25,7 @@ export const conversations = pgTable('conversations', {
   uniqueIndex('conversations_tenant_uq').on(t.subAccountId, t.id),
   index('conversations_inbox_idx').on(t.subAccountId, t.status, t.lastMessageAt),
   index('conversations_contact_idx').on(t.subAccountId, t.contactId, t.channel),
+  index('conversations_assigned_idx').on(t.subAccountId, t.assignedUserId),
 ]);
 
 export type MessageStatus = 'scheduled' | 'queued' | 'sending' | 'sent' | 'delivered' | 'failed' | 'received' | 'logged';
@@ -50,6 +52,8 @@ export const messages = pgTable('messages', {
   scheduledAt: ts('scheduled_at'),
   sentAt: ts('sent_at'),
   error: text('error'),
+  /** Delivery attempts so far; transient failures are retried with backoff. */
+  attempts: integer('attempts').notNull().default(0),
   createdByUserId: uuid('created_by_user_id'),
   campaignId: uuid('campaign_id'),
   workflowRunId: uuid('workflow_run_id'),
@@ -291,14 +295,33 @@ export const notifications = pgTable('notifications', {
   index('notifications_unread_idx').on(t.subAccountId, t.readAt, t.createdAt),
 ]);
 
+/**
+ * Append-only history. Rows are written by database triggers (entity changes)
+ * and SECURITY DEFINER functions (sign-ins, explicit events); the runtime role
+ * cannot update or delete them.
+ */
 export const auditLog = pgTable('audit_log', {
   id: pk(),
-  subAccountId: subAccountId(),
+  accountId: uuid('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  /** Null for account-level events (sign-in, roles, team). */
+  subAccountId: uuid('sub_account_id').references(() => subAccounts.id, { onDelete: 'cascade' }),
   actorUserId: uuid('actor_user_id'),
+  /** 'user' | 'system' | 'public' | 'api' */
   actor: text('actor').notNull().default('user'),
+  /** e.g. API key name or "Customer (online)". */
+  actorLabel: text('actor_label'),
+  /** e.g. 'invoice.created', 'invoice.updated', 'auth.login'. */
   action: text('action').notNull(),
   entityType: text('entity_type'),
   entityId: uuid('entity_id'),
+  /** Human label captured at the time, e.g. "INV-1042" or "John Smith". */
+  entityLabel: text('entity_label'),
+  /** { changed: { field: [from, to] } } for updates; secrets are never recorded. */
   data: jsonb('data').$type<Record<string, unknown>>().notNull().default({}),
+  ip: text('ip'),
   createdAt: createdAt(),
-}, (t) => [index('audit_log_entity_idx').on(t.subAccountId, t.entityType, t.entityId)]);
+}, (t) => [
+  index('audit_log_entity_idx').on(t.subAccountId, t.entityType, t.entityId),
+  index('audit_log_sub_account_time_idx').on(t.subAccountId, t.createdAt),
+  index('audit_log_account_time_idx').on(t.accountId, t.createdAt),
+]);

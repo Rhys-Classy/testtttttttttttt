@@ -1,7 +1,36 @@
 @import "tailwindcss";
 
-/* Calm, low-contrast surfaces with one clear accent. Dark mode follows the OS. */
+/*
+ * Dark by default: soft charcoal surfaces, off-white text (never pure #fff on
+ * pure black), desaturated status colours. Light is opt-in per user
+ * (Settings → My account) via <html data-theme>.
+ */
 :root {
+  color-scheme: dark;
+  --bg: #0f1216;
+  --surface: #151920;
+  --surface-2: #1b2029;
+  --border: #272d38;
+  --text: #d3d8e0;
+  --muted: #8b94a3;
+  --accent: #8e97ef;
+  --accent-fg: #0f1216;
+  --accent-soft: #1f2340;
+  --on-solid: #0f1216;
+  --danger: #ea8a8a;
+  --danger-soft: #2a1719;
+  --warn: #e0b25e;
+  --warn-soft: #2a2213;
+  --ok: #5fc49b;
+  --ok-soft: #13271f;
+  --ring: #6b74d9;
+  --chart-1: #7c83f5;
+  --chart-grid: #272d38;
+  --backdrop: rgb(5 7 10 / 0.6);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
   --bg: #f6f7f9;
   --surface: #ffffff;
   --surface-2: #f1f3f6;
@@ -11,6 +40,7 @@
   --accent: #4f46e5;
   --accent-fg: #ffffff;
   --accent-soft: #eef2ff;
+  --on-solid: #ffffff;
   --danger: #dc2626;
   --danger-soft: #fef2f2;
   --warn: #b45309;
@@ -20,28 +50,32 @@
   --ring: #a5b4fc;
   --chart-1: #4f46e5;
   --chart-grid: #e4e7ec;
+  --backdrop: rgb(15 23 42 / 0.45);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b0f17;
-    --surface: #121826;
-    --surface-2: #182033;
-    --border: #243049;
-    --text: #e5e9f2;
-    --muted: #93a0b8;
-    --accent: #818cf8;
-    --accent-fg: #0b0f17;
-    --accent-soft: #1e2345;
-    --danger: #f87171;
-    --danger-soft: #2a1416;
-    --warn: #fbbf24;
-    --warn-soft: #2a2110;
-    --ok: #34d399;
-    --ok-soft: #0f2a22;
-    --ring: #4f46e5;
-    --chart-1: #7c83f5;
-    --chart-grid: #243049;
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"] {
+    color-scheme: light;
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #f1f3f6;
+    --border: #e4e7ec;
+    --text: #0f172a;
+    --muted: #64748b;
+    --accent: #4f46e5;
+    --accent-fg: #ffffff;
+    --accent-soft: #eef2ff;
+    --on-solid: #ffffff;
+    --danger: #dc2626;
+    --danger-soft: #fef2f2;
+    --warn: #b45309;
+    --warn-soft: #fffbeb;
+    --ok: #047857;
+    --ok-soft: #ecfdf5;
+    --ring: #a5b4fc;
+    --chart-1: #4f46e5;
+    --chart-grid: #e4e7ec;
+    --backdrop: rgb(15 23 42 / 0.45);
   }
 }
 
@@ -55,6 +89,7 @@
   --color-accent: var(--accent);
   --color-accent-fg: var(--accent-fg);
   --color-accent-soft: var(--accent-soft);
+  --color-on-solid: var(--on-solid);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-warn: var(--warn);
@@ -64,6 +99,7 @@
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-grid: var(--chart-grid);
+  --color-backdrop: var(--backdrop);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -87,9 +123,39 @@ input, select, textarea {
   color: var(--text);
 }
 
+::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
+}
+
 dialog::backdrop {
-  background: rgb(15 23 42 / 0.45);
+  background: var(--backdrop);
   backdrop-filter: blur(2px);
+}
+
+/* Customer documents: white paper on public links and in print; dimmed in the app. */
+.doc-paper {
+  --doc-bg: #ffffff;
+  --doc-text: #0f172a;
+  --doc-muted: #64748b;
+  --doc-line: #e2e8f0;
+  --doc-line-soft: #f1f5f9;
+}
+.doc-app {
+  --doc-bg: var(--surface);
+  --doc-text: var(--text);
+  --doc-muted: var(--muted);
+  --doc-line: var(--border);
+  --doc-line-soft: var(--surface-2);
+}
+@media print {
+  .doc-app {
+    --doc-bg: #ffffff;
+    --doc-text: #0f172a;
+    --doc-muted: #64748b;
+    --doc-line: #e2e8f0;
+    --doc-line-soft: #f1f5f9;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -97,3 +163,9 @@ dialog::backdrop {
 }
 
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+
+/* Skeleton shimmer for loading states — gentle, no flashing. */
+.skeleton {
+  background: var(--surface-2);
+  border-radius: 0.5rem;
+}

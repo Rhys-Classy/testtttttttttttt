@@ -10,8 +10,8 @@ export const metadata = { title: 'New page' };
 
 export default async function NewLandingPage() {
   const ctx = await requireContext();
-  const scope = moduleScope(ctx, 'landing_pages');
-  if (!scope.businesses.length) return <ModuleOff label="Landing pages" business={ctx.current?.name} />;
+  const scope = moduleScope(ctx, 'landing_pages', undefined, 'marketing.edit');
+  if (!scope.businesses.length) return <ModuleOff label="Landing pages" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const fb = await formsByBusiness(ctx, scope.ids);
   const firstForm = ctx.current ? fb[ctx.current.id]?.[0] : undefined;
   return (

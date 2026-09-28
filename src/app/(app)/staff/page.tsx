@@ -18,7 +18,7 @@ export default async function StaffPage({ searchParams }: { searchParams: SP }) 
   const ctx = await requireContext();
   const p = await searchParams;
   const scope = moduleScope(ctx, 'staff', sp1(p.b));
-  if (!scope.businesses.length) return <ModuleOff label="Staff" business={ctx.current?.name} />;
+  if (!scope.businesses.length) return <ModuleOff label="Staff" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const rows = await readScope(ctx, (tx) => tx.select({
     s: staffMembers,
     upcoming: sql<number>`(select count(*) from ${appointments} a where a.staff_id = ${staffMembers.id} and a.sub_account_id = ${staffMembers.subAccountId} and a.starts_at >= now() and a.status <> 'cancelled')`,

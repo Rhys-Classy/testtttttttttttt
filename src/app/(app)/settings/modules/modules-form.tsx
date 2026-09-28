@@ -22,7 +22,7 @@ export function ModulesForm({ subAccountId, modules, enabled }: { subAccountId: 
               className={cn('flex items-start gap-3 rounded-2xl border p-4 text-left', active ? 'border-accent bg-accent-soft/50' : 'border-border bg-surface', m.core && 'opacity-70')}>
               <Icon name={m.icon} className={cn('mt-0.5 size-5', active ? 'text-accent' : 'text-muted')} />
               <div className="flex-1"><p className="font-medium">{m.label}{m.core ? <span className="ml-2 text-xs text-muted">always on</span> : null}</p><p className="text-sm text-muted">{m.description}</p></div>
-              <span className={cn('mt-1 h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors', active ? 'bg-accent' : 'bg-border')}><span className={cn('block size-4 rounded-full bg-white transition-transform', active && 'translate-x-4')} /></span>
+              <span className={cn('mt-1 h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors', active ? 'bg-accent' : 'bg-border')}><span className={cn('block size-4 rounded-full bg-text transition-transform', active && 'translate-x-4')} /></span>
             </button>
           );
         })}

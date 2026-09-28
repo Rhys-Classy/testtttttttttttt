@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { CalendarDays, ChevronRight, Hammer } from 'lucide-react';
-import { readScope, requireContext, businessById } from '@/server/context';
+import { readScope, requireContext, businessById, can } from '@/server/context';
 import { getAttention, getBusinessSummaries, getMoney, getPipelineSummary, getToday } from '@/server/queries/dashboard';
 import { contactName } from '@/server/services/crm';
 import { formatDate, formatTime, todayKey, zonedParts } from '@/lib/dates';
@@ -27,13 +27,15 @@ export default async function HomePage() {
   const now = new Date();
   const ids = ctx.scopeIds;
   const all = !ctx.current;
+  // Sections follow the role: money only for people who can see invoices.
+  const showMoney = can(ctx, 'invoices.view');
 
   const data = await readScope(ctx, async (tx) => ({
     attention: await getAttention(tx, ids, tz, now),
     today: await getToday(tx, ids, tz, now),
-    money: await getMoney(tx, ids, tz, now),
-    pipeline: ctx.current ? await getPipelineSummary(tx, ctx.current.id) : null,
-    cards: all ? await getBusinessSummaries(tx, ids, tz, now) : [],
+    money: showMoney ? await getMoney(tx, ids, tz, now) : null,
+    pipeline: ctx.current && can(ctx, 'sales.view', ctx.current.id) ? await getPipelineSummary(tx, ctx.current.id) : null,
+    cards: all && showMoney ? await getBusinessSummaries(tx, ids, tz, now) : [],
   }));
 
   const bizList = ctx.businesses.map((b) => ({ id: b.id, name: b.name, shortName: b.shortName, color: b.color }));
@@ -56,7 +58,10 @@ export default async function HomePage() {
         </p>
       </div>
 
-      <QuickActions modules={modules} />
+      <QuickActions modules={modules} allowed={{
+        lead: can(ctx, 'sales.edit'), contact: can(ctx, 'contacts.edit'), quote: can(ctx, 'quotes.edit'), invoice: can(ctx, 'invoices.edit'),
+        task: can(ctx, 'tasks.edit'), appointment: can(ctx, 'calendar.edit'), message: can(ctx, 'inbox.send'), automation: can(ctx, 'automations.edit'),
+      }} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         <div className="space-y-6 lg:col-span-3">
@@ -121,6 +126,7 @@ export default async function HomePage() {
         </div>
 
         <div className="space-y-6 lg:col-span-2">
+          {data.money ? (
           <Card>
             <CardHeader title="Money" subtitle={all ? 'All businesses combined' : ctx.current?.name} action={<Link href="/invoices?status=outstanding" className="text-sm font-medium text-accent">Invoices</Link>} />
             <CardBody className="grid grid-cols-2 gap-x-4 gap-y-5">
@@ -131,6 +137,7 @@ export default async function HomePage() {
               <Stat label="Due next 7 days" value={formatMoney(data.money.upcomingCents)} hint={`${data.money.upcomingCount} invoice${data.money.upcomingCount === 1 ? '' : 's'}`} />
             </CardBody>
           </Card>
+          ) : null}
 
           {data.pipeline ? (
             <Card>
@@ -141,7 +148,7 @@ export default async function HomePage() {
         </div>
       </div>
 
-      {all ? (
+      {all && showMoney ? (
         <section>
           <h2 className="mb-3 text-sm font-semibold">Your businesses</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">

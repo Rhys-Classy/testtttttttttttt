@@ -22,7 +22,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: SP 
   const p = await searchParams;
   const b = sp1(p.b);
   const scope = moduleScope(ctx, 'products', b);
-  if (!scope.businesses.length) return <ModuleOff label="Products" business={ctx.current?.name} />;
+  if (!scope.businesses.length) return <ModuleOff label="Products" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const rows = await readScope(ctx, (tx) => tx.select().from(products).where(sql`${products.subAccountId} = any(${pgArray(scope.ids)})`).orderBy(asc(products.category), asc(products.name)));
   const bizOpts = scope.businesses.map((x) => ({ id: x.id, name: x.name }));
   const taxCodes = AU_GST.codes.map((c) => ({ code: c.code, label: c.label }));

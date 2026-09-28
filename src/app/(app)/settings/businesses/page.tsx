@@ -21,11 +21,11 @@ export default async function BusinessesPage() {
           <div key={b.id} className="flex items-center gap-3 py-3">
             <BusinessDot color={b.color} />
             <div className="min-w-0 flex-1"><p className="font-medium">{b.name}</p><p className="text-xs text-muted">{b.enabledModules.length} modules · {b.timezone} · {b.taxRegime.replace('_', ' ')}</p></div>
-            {ctx.isAccountAdmin ? <ArchiveButton id={b.id} name={b.name} /> : null}
+            {ctx.isOwner ? <ArchiveButton id={b.id} name={b.name} /> : null}
           </div>
         ))}
       </CardBody></Card>
-      {ctx.isAccountAdmin ? (
+      {ctx.isOwner ? (
         <Card><CardHeader title="Add a business" /><CardBody>
           <ActionForm action={addBusinessAction} resetOnSuccess className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_14rem_5rem_auto] sm:items-end">
             <Field label="Business name"><Input name="name" required placeholder="New business" /></Field>

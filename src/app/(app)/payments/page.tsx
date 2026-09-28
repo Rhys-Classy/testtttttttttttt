@@ -6,7 +6,8 @@ import { dayRange, formatDateTime, monthRange, todayKey, weekRange } from '@/lib
 import { formatMoney } from '@/lib/money';
 import { businessById, readScope, requireContext } from '@/server/context';
 import { contactName } from '@/server/services/crm';
-import { moduleScope, qs, sp1, type SP } from '@/server/page-helpers';
+import { moduleScope, qs, sp1, type SP, pageOf, splitPage } from '@/server/page-helpers';
+import { Pager } from '@/components/ui/pager';
 import { PageHeader, Stat } from '@/components/ui/page';
 import { Card } from '@/components/ui/card';
 import { List, ListRow, Tabs } from '@/components/ui/list';
@@ -24,7 +25,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: SP 
   const status = sp1(p.status);
   const b = sp1(p.b);
   const scope = moduleScope(ctx, 'payments', b);
-  if (!scope.businesses.length) return <ModuleOff label="Payments" business={ctx.current?.name} />;
+  if (!scope.businesses.length) return <ModuleOff label="Payments" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const tz = ctx.tz;
   const today = todayKey(tz);
   const d = dayRange(today, tz);
@@ -32,7 +33,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: SP 
   const m = monthRange(today, tz);
   const all = !ctx.current;
 
-  const { stats, rows } = await readScope(ctx, async (tx) => {
+  const pg = pageOf(p);
+  const { stats, rows: fetched } = await readScope(ctx, async (tx) => {
     const base = sql`${payments.subAccountId} = any(${pgArray(scope.ids)})`;
     const ok = sql`${payments.status} in ('succeeded','partially_refunded','refunded')`;
     const net = (from: Date) => sql<number>`coalesce(sum(${payments.amountCents} - ${payments.refundedCents}) filter (where ${ok} and ${payments.paidAt} >= ${from}), 0)`;
@@ -47,9 +49,10 @@ export default async function PaymentsPage({ searchParams }: { searchParams: SP 
       .leftJoin(contacts, and(eq(contacts.id, payments.contactId), eq(contacts.subAccountId, payments.subAccountId)))
       .leftJoin(invoices, and(eq(invoices.id, payments.invoiceId), eq(invoices.subAccountId, payments.subAccountId)))
       .where(and(base, status ? (status === 'refunds' ? gte(payments.refundedCents, 1) : eq(payments.status, status as never)) : undefined))
-      .orderBy(desc(sql`coalesce(${payments.paidAt}, ${payments.createdAt})`)).limit(200);
+      .orderBy(desc(sql`coalesce(${payments.paidAt}, ${payments.createdAt})`), desc(payments.id)).limit(pg.limit).offset(pg.offset);
     return { stats: s, rows };
   });
+  const { rows, hasNext } = splitPage(fetched);
   const base = { status, b };
   const tabs = [
     { key: 'all', label: 'All', href: `/payments${qs(base, { status: undefined })}` },
@@ -80,6 +83,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: SP 
           ))}
         </List>
       ) : <EmptyState title="No payments yet" body="Payments appear here when customers pay online or you record one on an invoice." />}
+      <Pager path="/payments" params={p} page={pg.page} hasNext={hasNext} shown={rows.length} />
     </div>
   );
 }

@@ -18,7 +18,7 @@ export default async function FormsPage({ searchParams }: { searchParams: SP }) 
   const ctx = await requireContext();
   const p = await searchParams;
   const scope = moduleScope(ctx, 'forms', sp1(p.b));
-  if (!scope.businesses.length) return <ModuleOff label="Forms" business={ctx.current?.name} />;
+  if (!scope.businesses.length) return <ModuleOff label="Forms" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const rows = await readScope(ctx, (tx) => tx.select().from(forms).where(sql`${forms.subAccountId} = any(${pgArray(scope.ids)})`).orderBy(desc(forms.updatedAt)));
   return (
     <div>

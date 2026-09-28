@@ -20,7 +20,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: SP })
   const ctx = await requireContext();
   const p = await searchParams;
   const scope = moduleScope(ctx, 'orders', sp1(p.b));
-  if (!scope.businesses.length) return <ModuleOff label="Orders" business={ctx.current?.name} />;
+  if (!scope.businesses.length) return <ModuleOff label="Orders" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const rows = await readScope(ctx, (tx) => tx.select({ o: orders, c: contacts }).from(orders)
     .leftJoin(contacts, and(eq(contacts.id, orders.contactId), eq(contacts.subAccountId, orders.subAccountId)))
     .where(sql`${orders.subAccountId} = any(${pgArray(scope.ids)})`).orderBy(desc(orders.createdAt)).limit(200));

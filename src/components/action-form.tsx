@@ -4,6 +4,7 @@ import { useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/components/toast';
 import { FormError } from '@/components/ui/form';
+import { cn } from '@/lib/cn';
 
 type Result = { ok: true; message?: string } | { ok: false; error: string };
 
@@ -13,7 +14,7 @@ export function ActionForm({ action, children, className, resetOnSuccess }: { ac
   const [pending, start] = useTransition();
   const router = useRouter();
   return (
-    <form className={className} onSubmit={(e) => {
+    <form onSubmit={(e) => {
       e.preventDefault();
       const form = e.currentTarget;
       const fd = new FormData(form, (e.nativeEvent as SubmitEvent).submitter as HTMLElement | null);
@@ -26,7 +27,8 @@ export function ActionForm({ action, children, className, resetOnSuccess }: { ac
         router.refresh();
       });
     }}>
-      <fieldset disabled={pending} className="contents">
+      {/* The layout class lives on the fieldset so spacing utilities reach the fields. */}
+      <fieldset disabled={pending} className={cn('min-w-0', className)}>
         <FormError error={error} />
         {children}
       </fieldset>

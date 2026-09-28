@@ -1,4 +1,5 @@
 import {
+  bigint,
   boolean,
   index,
   integer,
@@ -7,6 +8,7 @@ import {
   text,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { pgTable } from 'drizzle-orm/pg-core';
 import { Address, createdAt, pk, ts, updatedAt } from './_shared';
@@ -21,9 +23,25 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   passwordHash: text('password_hash').notNull(),
   timezone: text('timezone').notNull().default('Australia/Melbourne'),
+  /** TOTP secret, AES-256-GCM encrypted. The runtime role cannot SELECT this column. */
+  mfaSecretEncrypted: text('mfa_secret_encrypted'),
+  mfaEnabledAt: ts('mfa_enabled_at'),
+  /** Last accepted TOTP time step: stops a code being replayed. */
+  mfaLastStep: bigint('mfa_last_step', { mode: 'number' }),
+  /** sha256 of unused one-time recovery codes. */
+  mfaRecoveryHashes: text('mfa_recovery_hashes').array().notNull().default([]),
+  passwordChangedAt: ts('password_changed_at'),
+  lastLoginAt: ts('last_login_at'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [uniqueIndex('users_email_uq').on(t.email)]);
+
+/** Columns the runtime role may read on `users` (secrets are read via SECURITY DEFINER functions only). */
+export const publicUserColumns = {
+  id: users.id, email: users.email, name: users.name, timezone: users.timezone,
+  mfaEnabledAt: users.mfaEnabledAt, lastLoginAt: users.lastLoginAt, passwordChangedAt: users.passwordChangedAt,
+  createdAt: users.createdAt,
+} as const;
 
 export const sessions = pgTable('sessions', {
   id: pk(),
@@ -31,6 +49,9 @@ export const sessions = pgTable('sessions', {
   tokenHash: text('token_hash').notNull(),
   expiresAt: ts('expires_at').notNull(),
   userAgent: text('user_agent'),
+  ip: text('ip'),
+  /** Sliding idle timeout: sessions unused for longer than the account's idle limit are rejected. */
+  lastSeenAt: ts('last_seen_at').notNull().defaultNow(),
   createdAt: createdAt(),
 }, (t) => [uniqueIndex('sessions_token_hash_uq').on(t.tokenHash), index('sessions_user_idx').on(t.userId)]);
 
@@ -47,16 +68,46 @@ export const accounts = pgTable('accounts', {
 export type AccountSettings = {
   defaultTimezone?: string;
   aiEnabled?: boolean;
+  /** Everyone must set up two-step verification before using the app. */
+  requireMfa?: boolean;
+  /** Sign out after this many minutes without activity (default 7 days). */
+  sessionIdleMinutes?: number;
 };
 
-export type AccountRole = 'owner' | 'admin' | 'member';
+/**
+ * Roles are per master account: five starting roles (Admin, Manager, Staff,
+ * Accountant, Viewer) plus any the owner adds. Permissions are editable.
+ * The account owner is not a role: owners always have full access.
+ */
+export const roles = pgTable('roles', {
+  id: pk(),
+  accountId: uuid('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  /** Set for the starting roles ('admin', 'manager', 'staff', 'accountant', 'viewer'); null for custom roles. */
+  key: text('key'),
+  name: text('name').notNull(),
+  description: text('description'),
+  permissions: text('permissions').array().notNull().default([]),
+  /** 'assigned' = only customers/jobs/tasks/appointments assigned to the person. */
+  dataScope: text('data_scope').$type<'all' | 'assigned'>().notNull().default('all'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  uniqueIndex('roles_account_name_uq').on(t.accountId, t.name),
+  uniqueIndex('roles_account_key_uq').on(t.accountId, t.key),
+  uniqueIndex('roles_account_id_uq').on(t.accountId, t.id),
+]);
+
+export type AccountRole = 'owner' | 'member';
 
 export const accountMembers = pgTable('account_members', {
   accountId: uuid('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /** 'owner' = full access to every business. 'member' = access comes from roles. */
   role: text('role').$type<AccountRole>().notNull().default('member'),
+  /** Optional: this role in EVERY business of the account, including ones added later. */
+  allBusinessesRoleId: uuid('all_businesses_role_id').references((): AnyPgColumn => roles.id, { onDelete: 'set null' }),
   createdAt: createdAt(),
-}, (t) => [primaryKey({ columns: [t.accountId, t.userId] })]);
+}, (t) => [primaryKey({ columns: [t.accountId, t.userId] }), index('account_members_user_idx').on(t.userId)]);
 
 /* ------------------------------------------------------------------ */
 /* Sub-accounts (businesses)                                           */
@@ -123,15 +174,35 @@ export const subAccounts = pgTable('sub_accounts', {
   index('sub_accounts_account_idx').on(t.accountId),
 ]);
 
-export type SubAccountRole = 'admin' | 'staff' | 'viewer';
-
-/** Access for users who are not account owners/admins (e.g. a head installer who only sees one business). */
+/**
+ * A person's role in ONE business (e.g. a head installer who is Staff in
+ * Classy Kitchen Facelifts only). Overrides an all-businesses role for that business.
+ */
 export const subAccountMembers = pgTable('sub_account_members', {
   subAccountId: uuid('sub_account_id').notNull().references(() => subAccounts.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  role: text('role').$type<SubAccountRole>().notNull().default('staff'),
+  roleId: uuid('role_id').notNull().references(() => roles.id, { onDelete: 'restrict' }),
   createdAt: createdAt(),
-}, (t) => [primaryKey({ columns: [t.subAccountId, t.userId] })]);
+}, (t) => [primaryKey({ columns: [t.subAccountId, t.userId] }), index('sub_account_members_user_idx').on(t.userId)]);
+
+/**
+ * API keys for the REST API (/api/v1). Each key belongs to ONE business and
+ * carries its own permission list. Only a sha256 of the key is stored.
+ */
+export const apiKeys = pgTable('api_keys', {
+  id: pk(),
+  subAccountId: uuid('sub_account_id').notNull().references(() => subAccounts.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  /** First characters of the key, shown so people can tell keys apart. */
+  prefix: text('prefix').notNull(),
+  keyHash: text('key_hash').notNull(),
+  permissions: text('permissions').array().notNull().default([]),
+  createdByUserId: uuid('created_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  lastUsedAt: ts('last_used_at'),
+  expiresAt: ts('expires_at'),
+  revokedAt: ts('revoked_at'),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex('api_keys_hash_uq').on(t.keyHash), index('api_keys_sub_account_idx').on(t.subAccountId)]);
 
 /* ------------------------------------------------------------------ */
 /* Integrations: Master Account -> (optional) Sub Account -> Integration */

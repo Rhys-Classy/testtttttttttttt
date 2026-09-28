@@ -2,7 +2,7 @@ import { and, asc, eq, gte, inArray, or, sql } from 'drizzle-orm';
 import { contacts, tasks } from '@/db/schema';
 import { pgArray } from '@/db/sql';
 import { addDaysKey, dayRange, formatDate, formatTime, todayKey } from '@/lib/dates';
-import { businessById, readScope, requireContext } from '@/server/context';
+import { can, businessById, readScope, requireContext } from '@/server/context';
 import { contactName } from '@/server/services/crm';
 import { qs, sp1, type SP } from '@/server/page-helpers';
 import { PageHeader } from '@/components/ui/page';
@@ -13,10 +13,13 @@ import { EmptyState } from '@/components/ui/empty';
 import { Button } from '@/components/ui/button';
 import { AddTaskInline } from './add-task-inline';
 
+import { NoAccess } from '@/components/no-access';
+
 export const metadata = { title: 'My Day' };
 
 export default async function TasksPage({ searchParams }: { searchParams: SP }) {
   const ctx = await requireContext();
+  if (!can(ctx, 'tasks.view')) return <NoAccess what="tasks" />;
   const p = await searchParams;
   const view = sp1(p.view) ?? 'today';
   const b = sp1(p.b);

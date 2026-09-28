@@ -27,7 +27,7 @@ export function TopBar({ data }: { data: ShellData }) {
         </button>
         <Link href="/notifications" className="relative flex size-11 items-center justify-center rounded-xl text-muted hover:bg-surface-2" aria-label={`Notifications${data.unread ? ` (${data.unread} unread)` : ''}`}>
           <Bell className="size-5" />
-          {data.unread ? <span className="absolute right-2 top-2 flex min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">{data.unread > 9 ? '9+' : data.unread}</span> : null}
+          {data.unread ? <span className="absolute right-2 top-2 flex min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-on-solid">{data.unread > 9 ? '9+' : data.unread}</span> : null}
         </Link>
       </div>
     </header>

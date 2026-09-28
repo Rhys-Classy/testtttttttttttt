@@ -3,9 +3,10 @@ import { Building2, Search } from 'lucide-react';
 import { companies, contacts } from '@/db/schema';
 import { pgArray } from '@/db/sql';
 import { relativeTime } from '@/lib/dates';
-import { businessById, label, readScope, requireContext } from '@/server/context';
+import { can, businessById, label, readScope, requireContext } from '@/server/context';
 import { contactName } from '@/server/services/crm';
-import { qs, sp1, type SP } from '@/server/page-helpers';
+import { qs, sp1, type SP, pageOf, splitPage } from '@/server/page-helpers';
+import { Pager } from '@/components/ui/pager';
 import { PageHeader } from '@/components/ui/page';
 import { List, ListRow, Tabs } from '@/components/ui/list';
 import { StatusBadge } from '@/components/ui/badge';
@@ -14,10 +15,13 @@ import { BusinessFilter } from '@/components/business-filter';
 import { EmptyState } from '@/components/ui/empty';
 import { AddButton } from '@/components/add-button';
 
+import { NoAccess } from '@/components/no-access';
+
 export const metadata = { title: 'Contacts' };
 
 export default async function ContactsPage({ searchParams }: { searchParams: SP }) {
   const ctx = await requireContext();
+  if (!can(ctx, 'contacts.view')) return <NoAccess what="customers" />;
   const p = await searchParams;
   const q = sp1(p.q)?.trim();
   const status = sp1(p.status);
@@ -29,6 +33,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: SP 
   const all = !ctx.current;
   const plural = label(ctx, 'contacts', 'Contacts');
 
+  const pg = pageOf(p);
   const data = await readScope(ctx, async (tx) => {
     const conds = [sql`${contacts.subAccountId} = any(${pgArray(ids)})`, isNull(contacts.archivedAt)];
     if (q) {
@@ -40,14 +45,16 @@ export default async function ContactsPage({ searchParams }: { searchParams: SP 
     if (company) conds.push(eq(contacts.companyId, company));
     const people = tab === 'people' ? await tx.select({ c: contacts, co: companies }).from(contacts)
       .leftJoin(companies, and(eq(companies.id, contacts.companyId), eq(companies.subAccountId, contacts.subAccountId)))
-      .where(and(...conds)).orderBy(desc(contacts.updatedAt)).limit(200) : [];
+      .where(and(...conds)).orderBy(desc(contacts.updatedAt), desc(contacts.id)).limit(pg.limit).offset(pg.offset) : [];
     const counts = await tx.select({ status: contacts.status, n: sql<number>`count(*)` }).from(contacts)
       .where(and(sql`${contacts.subAccountId} = any(${pgArray(ids)})`, isNull(contacts.archivedAt))).groupBy(contacts.status);
     const cos = tab === 'companies' ? await tx.select({ co: companies, n: sql<number>`(select count(*) from contacts c where c.company_id = ${companies.id} and c.sub_account_id = ${companies.subAccountId})` })
       .from(companies).where(and(sql`${companies.subAccountId} = any(${pgArray(ids)})`, q ? ilike(companies.name, `%${q}%`) : undefined)).orderBy(companies.name).limit(200) : [];
     const tags = await tx.execute<{ tag: string; n: number }>(sql`select t as tag, count(*) as n from contacts, unnest(tags) t where sub_account_id = any(${pgArray(ids)}) and archived_at is null group by t order by n desc limit 12`);
-    return { people, counts, cos, tags: tags.rows };
+    return { ...splitPage(people), counts, cos, tags: tags.rows };
   });
+  const people = data.rows;
+  const hasNext = data.hasNext;
 
   const count = (s: string) => Number(data.counts.find((c) => c.status === s)?.n ?? 0);
   const total = data.counts.reduce((a, c) => a + Number(c.n), 0);
@@ -89,9 +96,9 @@ export default async function ContactsPage({ searchParams }: { searchParams: SP 
             ))}
           </List>
         ) : <EmptyState title="No companies yet" body="Companies are created automatically when you add a contact with a company name." />
-      ) : data.people.length ? (
+      ) : people.length ? (
         <List>
-          {data.people.map(({ c, co }) => (
+          {people.map(({ c, co }) => (
             <ListRow key={c.id} href={`/contacts/${c.id}`}
               icon={<span className="text-sm font-semibold">{(c.firstName[0] ?? c.email?.[0] ?? '?').toUpperCase()}{(c.lastName[0] ?? '').toUpperCase()}</span>}
               title={<span className="flex items-center gap-2">{contactName(c)}{co ? <span className="truncate text-xs font-normal text-muted">{c.jobTitle ? `${c.jobTitle}, ` : ''}{co.name}</span> : null}</span>}
@@ -100,6 +107,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: SP 
           ))}
         </List>
       ) : <EmptyState title={q ? `No one matches "${q}"` : 'No contacts yet'} body="Add someone with the + button, or they'll appear automatically from forms, messages and payments." />}
+      {tab === 'people' ? <Pager path="/contacts" params={p} page={pg.page} hasNext={hasNext} shown={people.length} /> : null}
     </div>
   );
 }

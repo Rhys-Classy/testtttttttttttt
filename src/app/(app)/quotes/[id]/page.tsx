@@ -35,7 +35,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       </div>
       <QuoteActions q={{ id: q.id, subAccountId: q.subAccountId, status: q.status, invoiceId: q.invoiceId, jobId: q.jobId }} link={quoteUrl(q.publicToken)} />
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="lg:col-span-2"><DocumentView business={d.business} customer={d.customer} lines={d.lines} doc={{ ...q, kind: 'quote' }} /></div>
+        <div className="lg:col-span-2"><DocumentView tone="app" business={d.business} customer={d.customer} lines={d.lines} doc={{ ...q, kind: 'quote' }} /></div>
         <div className="space-y-5">
           <Card>
             <CardHeader title="When accepted" />

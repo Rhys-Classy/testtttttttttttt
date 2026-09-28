@@ -11,8 +11,8 @@ export const metadata = { title: 'New form' };
 
 export default async function NewFormPage() {
   const ctx = await requireContext();
-  const scope = moduleScope(ctx, 'forms');
-  if (!scope.businesses.length) return <ModuleOff label="Forms" business={ctx.current?.name} />;
+  const scope = moduleScope(ctx, 'forms', undefined, 'marketing.edit');
+  if (!scope.businesses.length) return <ModuleOff label="Forms" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const fc = await formBuilderContext(ctx, scope.ids);
   return (
     <div>

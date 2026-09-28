@@ -18,7 +18,7 @@ export default async function PagesPage({ searchParams }: { searchParams: SP }) 
   const ctx = await requireContext();
   const p = await searchParams;
   const scope = moduleScope(ctx, 'landing_pages', sp1(p.b));
-  if (!scope.businesses.length) return <ModuleOff label="Landing pages" business={ctx.current?.name} />;
+  if (!scope.businesses.length) return <ModuleOff label="Landing pages" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const rows = await readScope(ctx, (tx) => tx.select().from(landingPages).where(sql`${landingPages.subAccountId} = any(${pgArray(scope.ids)})`).orderBy(desc(landingPages.updatedAt)));
   return (
     <div>

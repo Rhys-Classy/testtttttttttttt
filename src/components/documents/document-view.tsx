@@ -24,7 +24,7 @@ type Doc = {
 type Party = { name: string; company?: string | null; email?: string | null; phone?: string | null; address?: Record<string, string | undefined> | null; abn?: string | null } | null;
 
 /** The customer-facing document: used in-app, on the public link and when printing to PDF. */
-export function DocumentView({ doc, lines, business, customer }: { doc: Doc; lines: Line[]; business: Business; customer: Party }) {
+export function DocumentView({ doc, lines, business, customer, tone = 'paper' }: { doc: Doc; lines: Line[]; business: Business; customer: Party; tone?: 'paper' | 'app' }) {
   const regime = getTaxRegime(business.taxRegime);
   const title = regime.documentTitle(doc.kind, business.taxRegistered);
   const accent = (doc.kind === 'invoice' ? business.branding?.invoiceAccent : business.branding?.quoteAccent) ?? business.color;
@@ -32,15 +32,15 @@ export function DocumentView({ doc, lines, business, customer }: { doc: Doc; lin
   const balance = doc.totalCents - (doc.amountPaidCents ?? 0);
   const hasDiscount = lines.some((l) => l.discountPercent);
   return (
-    <article className="overflow-hidden rounded-2xl border border-border bg-white text-slate-900 print:rounded-none print:border-0">
+    <article className={`${tone === 'app' ? 'doc-app' : 'doc-paper'} overflow-hidden rounded-2xl border border-border bg-(--doc-bg) text-(--doc-text) print:rounded-none print:border-0`}>
       <div className="h-2" style={{ backgroundColor: accent }} />
       <div className="p-6 sm:p-10">
         <header className="flex flex-wrap items-start justify-between gap-6">
           <div>
             {business.branding?.logoUrl ? <img src={business.branding.logoUrl} alt="" className="mb-3 h-12 w-auto" /> : null}
             <p className="text-lg font-semibold">{business.tradingName ?? business.name}</p>
-            {business.legalName && business.legalName !== (business.tradingName ?? business.name) ? <p className="text-sm text-slate-500">{business.legalName}</p> : null}
-            <div className="mt-1 text-sm text-slate-500">
+            {business.legalName && business.legalName !== (business.tradingName ?? business.name) ? <p className="text-sm text-(--doc-muted)">{business.legalName}</p> : null}
+            <div className="mt-1 text-sm text-(--doc-muted)">
               {addr(business.address).map((l) => <p key={l}>{l}</p>)}
               {business.phone ? <p>{business.phone}</p> : null}
               {business.email ? <p>{business.email}</p> : null}
@@ -51,31 +51,31 @@ export function DocumentView({ doc, lines, business, customer }: { doc: Doc; lin
           <div className="text-right">
             <p className="text-2xl font-bold tracking-tight" style={{ color: accent }}>{title}</p>
             <p className="mt-1 text-sm font-medium">{doc.number}</p>
-            <dl className="mt-3 space-y-0.5 text-sm text-slate-500">
+            <dl className="mt-3 space-y-0.5 text-sm text-(--doc-muted)">
               <div><dt className="inline">Date: </dt><dd className="inline">{formatDate(doc.issueDate)}</dd></div>
-              {doc.dueDate ? <div><dt className="inline">Due: </dt><dd className="inline font-medium text-slate-900">{formatDate(doc.dueDate)}</dd></div> : null}
+              {doc.dueDate ? <div><dt className="inline">Due: </dt><dd className="inline font-medium text-(--doc-text)">{formatDate(doc.dueDate)}</dd></div> : null}
               {doc.expiryDate ? <div><dt className="inline">Valid until: </dt><dd className="inline">{formatDate(doc.expiryDate)}</dd></div> : null}
             </dl>
           </div>
         </header>
 
         <section className="mt-8">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{doc.kind === 'invoice' ? 'Bill to' : 'Prepared for'}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-(--doc-muted)">{doc.kind === 'invoice' ? 'Bill to' : 'Prepared for'}</p>
           {customer ? (
             <div className="mt-1 text-sm">
               <p className="font-medium">{customer.company ?? customer.name}</p>
               {customer.company ? <p>{customer.name}</p> : null}
-              {addr(customer.address).map((l) => <p key={l} className="text-slate-500">{l}</p>)}
-              {customer.email ? <p className="text-slate-500">{customer.email}</p> : null}
-              {customer.abn ? <p className="text-slate-500">{regime.businessIdLabel} {customer.abn}</p> : null}
+              {addr(customer.address).map((l) => <p key={l} className="text-(--doc-muted)">{l}</p>)}
+              {customer.email ? <p className="text-(--doc-muted)">{customer.email}</p> : null}
+              {customer.abn ? <p className="text-(--doc-muted)">{regime.businessIdLabel} {customer.abn}</p> : null}
             </div>
-          ) : <p className="mt-1 text-sm text-slate-500">—</p>}
+          ) : <p className="mt-1 text-sm text-(--doc-muted)">—</p>}
           {doc.title ? <p className="mt-4 font-medium">{doc.title}</p> : null}
         </section>
 
         <table className="mt-6 w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wider text-slate-500">
+            <tr className="border-b border-(--doc-line) text-left text-xs uppercase tracking-wider text-(--doc-muted)">
               <th className="py-2 pr-2 font-medium">Description</th>
               <th className="py-2 px-2 text-right font-medium">Qty</th>
               <th className="py-2 px-2 text-right font-medium">Price</th>
@@ -86,12 +86,12 @@ export function DocumentView({ doc, lines, business, customer }: { doc: Doc; lin
           </thead>
           <tbody>
             {lines.map((l) => (
-              <tr key={l.id} className="border-b border-slate-100 align-top">
+              <tr key={l.id} className="border-b border-(--doc-line-soft) align-top">
                 <td className="py-2.5 pr-2">{l.description}</td>
                 <td className="py-2.5 px-2 text-right tabular-nums">{Number(l.quantity)}</td>
                 <td className="py-2.5 px-2 text-right tabular-nums">{formatMoney(l.unitPriceCents, doc.currency)}</td>
                 {hasDiscount ? <td className="py-2.5 px-2 text-right tabular-nums">{l.discountPercent ? `${Number(l.discountPercent)}%` : ''}</td> : null}
-                <td className="hidden py-2.5 px-2 text-right text-slate-500 sm:table-cell">{l.taxRateBps ? `${l.taxRateBps / 100}%` : regime.codes.find((c) => c.code === l.taxCode)?.label ?? 'Free'}</td>
+                <td className="hidden py-2.5 px-2 text-right text-(--doc-muted) sm:table-cell">{l.taxRateBps ? `${l.taxRateBps / 100}%` : regime.codes.find((c) => c.code === l.taxCode)?.label ?? 'Free'}</td>
                 <td className="py-2.5 pl-2 text-right tabular-nums">{formatMoney(doc.pricesIncludeTax ? l.lineTotalCents : l.lineSubtotalCents, doc.currency)}</td>
               </tr>
             ))}
@@ -100,12 +100,12 @@ export function DocumentView({ doc, lines, business, customer }: { doc: Doc; lin
 
         <div className="mt-4 flex justify-end">
           <dl className="w-full max-w-xs space-y-1 text-sm">
-            <div className="flex justify-between"><dt className="text-slate-500">Subtotal{doc.pricesIncludeTax ? '' : ` (ex ${regime.taxName})`}</dt><dd className="tabular-nums">{formatMoney(doc.pricesIncludeTax ? doc.totalCents : doc.subtotalCents, doc.currency)}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">{doc.pricesIncludeTax ? `Includes ${regime.taxName}` : regime.taxName}</dt><dd className="tabular-nums">{formatMoney(doc.taxCents, doc.currency)}</dd></div>
-            <div className="flex justify-between border-t border-slate-200 pt-1.5 text-base font-semibold"><dt>Total {doc.currency}</dt><dd className="tabular-nums">{formatMoney(doc.totalCents, doc.currency)}</dd></div>
+            <div className="flex justify-between"><dt className="text-(--doc-muted)">Subtotal{doc.pricesIncludeTax ? '' : ` (ex ${regime.taxName})`}</dt><dd className="tabular-nums">{formatMoney(doc.pricesIncludeTax ? doc.totalCents : doc.subtotalCents, doc.currency)}</dd></div>
+            <div className="flex justify-between"><dt className="text-(--doc-muted)">{doc.pricesIncludeTax ? `Includes ${regime.taxName}` : regime.taxName}</dt><dd className="tabular-nums">{formatMoney(doc.taxCents, doc.currency)}</dd></div>
+            <div className="flex justify-between border-t border-(--doc-line) pt-1.5 text-base font-semibold"><dt>Total {doc.currency}</dt><dd className="tabular-nums">{formatMoney(doc.totalCents, doc.currency)}</dd></div>
             {doc.kind === 'invoice' && doc.amountPaidCents ? (
               <>
-                <div className="flex justify-between text-slate-500"><dt>Paid</dt><dd className="tabular-nums">−{formatMoney(doc.amountPaidCents, doc.currency)}</dd></div>
+                <div className="flex justify-between text-(--doc-muted)"><dt>Paid</dt><dd className="tabular-nums">−{formatMoney(doc.amountPaidCents, doc.currency)}</dd></div>
                 <div className="flex justify-between font-semibold"><dt>Balance due</dt><dd className="tabular-nums">{formatMoney(balance, doc.currency)}</dd></div>
               </>
             ) : null}
@@ -113,10 +113,10 @@ export function DocumentView({ doc, lines, business, customer }: { doc: Doc; lin
         </div>
 
         {doc.notes || doc.terms || (doc.kind === 'invoice' && business.bankDetails) ? (
-          <footer className="mt-8 grid grid-cols-1 gap-6 border-t border-slate-200 pt-6 text-sm sm:grid-cols-2">
-            {doc.kind === 'invoice' && business.bankDetails ? <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">How to pay</p><p className="mt-1 whitespace-pre-line">{business.bankDetails}</p></div> : null}
-            {doc.notes ? <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Notes</p><p className="mt-1 whitespace-pre-line">{doc.notes}</p></div> : null}
-            {doc.terms ? <div className="sm:col-span-2"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Terms</p><p className="mt-1 whitespace-pre-line text-slate-500">{doc.terms}</p></div> : null}
+          <footer className="mt-8 grid grid-cols-1 gap-6 border-t border-(--doc-line) pt-6 text-sm sm:grid-cols-2">
+            {doc.kind === 'invoice' && business.bankDetails ? <div><p className="text-xs font-semibold uppercase tracking-wider text-(--doc-muted)">How to pay</p><p className="mt-1 whitespace-pre-line">{business.bankDetails}</p></div> : null}
+            {doc.notes ? <div><p className="text-xs font-semibold uppercase tracking-wider text-(--doc-muted)">Notes</p><p className="mt-1 whitespace-pre-line">{doc.notes}</p></div> : null}
+            {doc.terms ? <div className="sm:col-span-2"><p className="text-xs font-semibold uppercase tracking-wider text-(--doc-muted)">Terms</p><p className="mt-1 whitespace-pre-line text-(--doc-muted)">{doc.terms}</p></div> : null}
           </footer>
         ) : null}
       </div>

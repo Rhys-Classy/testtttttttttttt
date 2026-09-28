@@ -6,7 +6,8 @@ import { formatDate, todayKey } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import { businessById, readScope, requireContext } from '@/server/context';
 import { contactName } from '@/server/services/crm';
-import { moduleScope, qs, sp1, type SP } from '@/server/page-helpers';
+import { moduleScope, qs, sp1, type SP, pageOf, splitPage } from '@/server/page-helpers';
+import { Pager } from '@/components/ui/pager';
 import { PageHeader, Stat } from '@/components/ui/page';
 import { List, ListRow, Tabs } from '@/components/ui/list';
 import { StatusBadge } from '@/components/ui/badge';
@@ -29,21 +30,23 @@ export default async function InvoicesPage({ searchParams }: { searchParams: SP 
   const status = sp1(p.status) && sp1(p.status)! in FILTERS ? sp1(p.status)! : 'outstanding';
   const b = sp1(p.b);
   const scope = moduleScope(ctx, 'invoices', b);
-  if (!scope.businesses.length) return <ModuleOff label="Invoices" business={ctx.current?.name} />;
+  if (!scope.businesses.length) return <ModuleOff label="Invoices" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const all = !ctx.current;
   const today = todayKey(ctx.tz);
 
-  const { rows, sums } = await readScope(ctx, async (tx) => {
+  const pg = pageOf(p);
+  const { rows: fetched, sums } = await readScope(ctx, async (tx) => {
     const base = sql`${invoices.subAccountId} = any(${pgArray(scope.ids)})`;
     const filter = FILTERS[status];
     return {
       rows: await tx.select({ i: invoices, c: contacts }).from(invoices)
         .leftJoin(contacts, and(eq(contacts.id, invoices.contactId), eq(contacts.subAccountId, invoices.subAccountId)))
         .where(and(base, filter ? inArray(invoices.status, filter as never[]) : undefined))
-        .orderBy(status === 'paid' ? desc(invoices.paidAt) : status === 'outstanding' || status === 'overdue' ? invoices.dueDate : desc(invoices.createdAt)).limit(300),
+        .orderBy(status === 'paid' ? desc(invoices.paidAt) : status === 'outstanding' || status === 'overdue' ? invoices.dueDate : desc(invoices.createdAt), desc(invoices.id)).limit(pg.limit).offset(pg.offset),
       sums: await tx.select({ s: invoices.status, n: sql<number>`count(*)`, bal: sql<number>`coalesce(sum(${invoices.totalCents} - ${invoices.amountPaidCents}), 0)` }).from(invoices).where(base).groupBy(invoices.status),
     };
   });
+  const { rows, hasNext } = splitPage(fetched);
   const cnt = (keys: string[]) => sums.filter((x) => keys.includes(x.s)).reduce((a, x) => a + Number(x.n), 0);
   const bal = (keys: string[]) => sums.filter((x) => keys.includes(x.s)).reduce((a, x) => a + Number(x.bal), 0);
   const base = { status: status === 'outstanding' ? undefined : status, b };
@@ -80,6 +83,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: SP 
           })}
         </List>
       ) : <EmptyState title="Nothing here" body={status === 'overdue' ? 'No overdue invoices. Nice.' : 'Create an invoice with the + button or type “invoice John $500 plus GST” in ⌘K.'} />}
+      <Pager path="/invoices" params={p} page={pg.page} hasNext={hasNext} shown={rows.length} />
     </div>
   );
 }

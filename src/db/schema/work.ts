@@ -34,6 +34,7 @@ export const tasks = pgTable('tasks', {
   uniqueIndex('tasks_tenant_uq').on(t.subAccountId, t.id),
   index('tasks_due_idx').on(t.subAccountId, t.status, t.dueAt),
   index('tasks_assignee_idx').on(t.assigneeUserId, t.status),
+  index('tasks_contact_idx').on(t.subAccountId, t.contactId),
 ]);
 
 export type AppointmentStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
@@ -61,6 +62,8 @@ export const appointments = pgTable('appointments', {
 }, (t) => [
   uniqueIndex('appointments_tenant_uq').on(t.subAccountId, t.id),
   index('appointments_starts_idx').on(t.subAccountId, t.startsAt),
+  index('appointments_assigned_idx').on(t.subAccountId, t.assignedUserId),
+  index('appointments_contact_idx').on(t.subAccountId, t.contactId),
 ]);
 
 export type JobStatus =
@@ -91,6 +94,8 @@ export const jobs = pgTable('jobs', {
   uniqueIndex('jobs_tenant_uq').on(t.subAccountId, t.id),
   uniqueIndex('jobs_number_uq').on(t.subAccountId, t.number),
   index('jobs_status_idx').on(t.subAccountId, t.status),
+  index('jobs_assigned_idx').on(t.subAccountId, t.assignedUserId),
+  index('jobs_contact_idx').on(t.subAccountId, t.contactId),
 ]);
 
 export type DocumentEntity = 'business' | 'contact' | 'company' | 'deal' | 'job' | 'invoice' | 'quote';
@@ -112,4 +117,5 @@ export const documents = pgTable('documents', {
 }, (t) => [
   uniqueIndex('documents_tenant_uq').on(t.subAccountId, t.id),
   index('documents_entity_idx').on(t.subAccountId, t.entityType, t.entityId),
+  index('documents_contact_idx').on(t.subAccountId, t.contactId),
 ]);

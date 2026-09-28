@@ -3,19 +3,21 @@ import Anthropic from '@anthropic-ai/sdk';
 import { env } from '@/lib/env';
 import { readScope, type AppContext } from '@/server/context';
 import { getGlobalCredentials } from '@/server/services/integrations';
+import { AnthropicAIProvider, type AIProvider } from '@/lib/providers/ai';
 import { friendlyError } from '@/server/actions/_util';
-import { TOOL_DEFS, dateContext, runTool, type PendingAction } from './tools';
+import { dateContext, runTool, toolsFor, type PendingAction } from './tools';
 
 export type ChatTurn = { role: 'user' | 'assistant'; content: string };
 export type AssistantReply = { text: string; pending: PendingAction[]; toolsUsed: string[] };
 
 const MAX_TOOL_ROUNDS = 8;
 
-async function resolveClient(ctx: AppContext) {
+/** The account's AI provider (key stored encrypted, account-wide), or the server default. */
+async function resolveProvider(ctx: AppContext): Promise<AIProvider | null> {
   const creds = await readScope(ctx, (tx) => getGlobalCredentials<{ apiKey: string }>(tx, 'anthropic'));
   const apiKey = creds?.secrets.apiKey ?? env().ANTHROPIC_API_KEY;
   if (!apiKey) return null;
-  return { client: new Anthropic({ apiKey }), model: creds?.config.model || env().AI_MODEL };
+  return new AnthropicAIProvider(apiKey, (creds?.config.model as string | undefined) || env().AI_MODEL);
 }
 
 function systemPrompt(ctx: AppContext) {
@@ -46,11 +48,10 @@ function systemPrompt(ctx: AppContext) {
  * scope (RLS applies); there is no raw database access available to the model.
  */
 export async function runAssistant(ctx: AppContext, history: ChatTurn[]): Promise<AssistantReply> {
-  const resolved = await resolveClient(ctx);
-  if (!resolved) {
+  const ai = await resolveProvider(ctx);
+  if (!ai) {
     return { text: 'The AI assistant is not connected yet. Add a Claude API key in Settings → Integrations (it is shared by all businesses). The command bar (Ctrl/⌘ K) works without it.', pending: [], toolsUsed: [] };
   }
-  const { client, model } = resolved;
   const messages: Anthropic.Beta.BetaMessageParam[] = history.slice(-20).map((t) => ({ role: t.role, content: t.content }));
   const pending: PendingAction[] = [];
   const toolsUsed: string[] = [];
@@ -58,11 +59,10 @@ export async function runAssistant(ctx: AppContext, history: ChatTurn[]): Promis
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     let response: Anthropic.Beta.BetaMessage;
     try {
-      response = await client.beta.messages.create({
-        model,
+      response = await ai.createMessage({
         max_tokens: 16000,
         system: [{ type: 'text', text: systemPrompt(ctx), cache_control: { type: 'ephemeral' } }],
-        tools: TOOL_DEFS,
+        tools: toolsFor(ctx),
         messages,
         output_config: { effort: 'medium' },
         betas: ['server-side-fallback-2026-07-01'],

@@ -3,6 +3,7 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import { contacts, products } from '@/db/schema';
 import { pgArray } from '@/db/sql';
 import { readScope, type AppContext } from '@/server/context';
+import { grantAllows } from '@/lib/permissions';
 import { contactName } from '@/server/services/crm';
 import type { EditorProduct } from '@/components/documents/doc-editor';
 
@@ -21,6 +22,7 @@ export async function editorData(ctx: AppContext, businessIds: string[], contact
 }
 
 export function editorBusinesses(ctx: AppContext, module: 'invoices' | 'quotes') {
-  return (ctx.current ? [ctx.current] : ctx.businesses).filter((b) => b.enabledModules.includes(module))
+  return (ctx.current ? [ctx.current] : ctx.businesses)
+    .filter((b) => b.enabledModules.includes(module) && grantAllows(ctx.grants[b.id], module === 'invoices' ? 'invoices.edit' : 'quotes.edit'))
     .map((b) => ({ id: b.id, name: b.name, taxRegime: b.taxRegime, taxRegistered: b.taxRegistered }));
 }

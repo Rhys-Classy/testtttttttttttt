@@ -1,23 +1,26 @@
 import type { Metadata, Viewport } from 'next';
+import { cookies } from 'next/headers';
+import { THEME_COOKIE, parseTheme } from '@/lib/theme';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: { default: 'Business OS', template: '%s · Business OS' },
   description: 'Run every business from one calm place.',
   applicationName: 'Business OS',
-  appleWebApp: { capable: true, title: 'Business OS', statusBarStyle: 'default' },
+  appleWebApp: { capable: true, title: 'Business OS', statusBarStyle: 'black-translucent' },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: [{ media: '(prefers-color-scheme: light)', color: '#f6f7f9' }, { media: '(prefers-color-scheme: dark)', color: '#0b0f17' }],
+  themeColor: '#0f1216',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
   return (
-    <html lang="en-AU">
+    <html lang="en-AU" data-theme={theme}>
       <body className="min-h-dvh">{children}</body>
     </html>
   );

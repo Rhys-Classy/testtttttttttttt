@@ -14,7 +14,7 @@ import { attempt, optStr, str } from './_util';
 export async function sendMessageAction(fd: FormData) {
   const ctx = await requireContext();
   const subAccountId = str(fd, 'subAccountId');
-  const res = await attempt(() => inBusiness(ctx, subAccountId, async (tx, s) => {
+  const res = await attempt(() => inBusiness(ctx, subAccountId, 'inbox.send', async (tx, s) => {
     const contactId = str(fd, 'contactId');
     if (!contactId) throw new ValidationError('No recipient.');
     const when = optStr(fd, 'scheduledAt');
@@ -24,14 +24,14 @@ export async function sendMessageAction(fd: FormData) {
     });
     await tx.update(conversations).set({ unread: false }).where(and(eq(conversations.subAccountId, s.subAccountId), eq(conversations.id, msg.conversationId)));
     return { conversationId: msg.conversationId };
-  }), optStr(fd, 'scheduledAt') ? 'Scheduled' : 'Sent');
+  }, { visible: [['contacts', str(fd, 'contactId')], ['conversations', optStr(fd, 'conversationId')]] }), optStr(fd, 'scheduledAt') ? 'Scheduled' : 'Sent');
   revalidatePath('/inbox');
   return res;
 }
 
 export async function internalNoteAction(subAccountId: string, conversationId: string, body: string) {
   const ctx = await requireContext();
-  const res = await attempt(() => inBusiness(ctx, subAccountId, (tx, s) => addInternalNote(tx, s, conversationId, body)).then(() => undefined), 'Note added');
+  const res = await attempt(() => inBusiness(ctx, subAccountId, 'inbox.send', (tx, s) => addInternalNote(tx, s, conversationId, body), { visible: [['conversations', conversationId]] }).then(() => undefined), 'Note added');
   revalidatePath('/inbox');
   return res;
 }
@@ -44,27 +44,27 @@ export async function conversationAction(subAccountId: string, id: string, op: '
     snooze_1h: { status: 'snoozed' as const, snoozedUntil: snoozeUntil('1h', tz), unread: false }, snooze_tomorrow: { status: 'snoozed' as const, snoozedUntil: snoozeUntil('tomorrow', tz), unread: false },
     read: { unread: false }, unread: { unread: true },
   }[op];
-  const res = await attempt(() => inBusiness(ctx, subAccountId, (tx, s) => updateConversation(tx, s, id, patch)).then(() => undefined));
+  const res = await attempt(() => inBusiness(ctx, subAccountId, 'inbox.send', (tx, s) => updateConversation(tx, s, id, patch), { visible: [['conversations', id]] }).then(() => undefined));
   revalidatePath('/inbox');
   return res;
 }
 
 export async function conversationToTaskAction(subAccountId: string, contactId: string) {
   const ctx = await requireContext();
-  const res = await attempt(() => inBusiness(ctx, subAccountId, async (tx, s) => {
+  const res = await attempt(() => inBusiness(ctx, subAccountId, ['tasks.edit', 'contacts.view'], async (tx, s) => {
     const c = await getContact(tx, s, contactId);
     await createTask(tx, s, { title: `Follow up ${contactName(c)}`, contactId, dueAt: new Date(), priority: 'high' });
-  }), 'Task created');
+  }, { visible: [['contacts', contactId]] }), 'Task created');
   revalidatePath('/', 'layout');
   return res;
 }
 
 export async function conversationToDealAction(subAccountId: string, contactId: string) {
   const ctx = await requireContext();
-  const res = await attempt(() => inBusiness(ctx, subAccountId, async (tx, s) => {
+  const res = await attempt(() => inBusiness(ctx, subAccountId, ['sales.edit', 'contacts.view'], async (tx, s) => {
     const c = await getContact(tx, s, contactId);
     await createDeal(tx, s, { title: contactName(c), contactId });
-  }), 'Deal created');
+  }, { visible: [['contacts', contactId]] }), 'Deal created');
   revalidatePath('/pipeline');
   return res;
 }

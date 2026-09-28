@@ -7,6 +7,9 @@ export type ShellData = {
   currentId: string | null;
   nav: NavItem[];
   unread: number;
-  isAccountAdmin: boolean;
+  isOwner: boolean;
+  canAdminister: boolean;
+  /** Which quick-add / command actions the user's role allows somewhere in view. */
+  can: Record<'contacts' | 'leads' | 'deals' | 'tasks' | 'appointments' | 'quotes' | 'invoices' | 'payments' | 'notes' | 'jobs' | 'ai', boolean>;
   tzOffsetMinutes: number;
 };

@@ -19,7 +19,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: SP
   const ctx = await requireContext();
   const p = await searchParams;
   const scope = moduleScope(ctx, 'campaigns', sp1(p.b));
-  if (!scope.businesses.length) return <ModuleOff label="Campaigns" business={ctx.current?.name} />;
+  if (!scope.businesses.length) return <ModuleOff label="Campaigns" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const rows = await readScope(ctx, (tx) => tx.select().from(campaigns).where(sql`${campaigns.subAccountId} = any(${pgArray(scope.ids)})`).orderBy(desc(campaigns.updatedAt)));
   return (
     <div>

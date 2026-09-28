@@ -25,7 +25,7 @@ export default async function AutomationsPage({ searchParams }: { searchParams: 
   const p = await searchParams;
   const b = sp1(p.b);
   const scope = moduleScope(ctx, 'automations', b);
-  if (!scope.businesses.length) return <ModuleOff label="Automations" business={ctx.current?.name} />;
+  if (!scope.businesses.length) return <ModuleOff label="Automations" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const rows = await readScope(ctx, (tx) => tx.select({
     w: workflows,
     active: sql<number>`(select count(*) from ${workflowRuns} r where r.workflow_id = ${workflows.id} and r.sub_account_id = ${workflows.subAccountId} and r.status in ('running','waiting'))`,

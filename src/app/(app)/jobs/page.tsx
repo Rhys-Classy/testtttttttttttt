@@ -26,7 +26,7 @@ export default async function JobsPage({ searchParams }: { searchParams: SP }) {
   const view = sp1(p.view) ?? 'active';
   const b = sp1(p.b);
   const scope = moduleScope(ctx, 'jobs', b);
-  if (!scope.businesses.length) return <ModuleOff label="Jobs" business={ctx.current?.name} />;
+  if (!scope.businesses.length) return <ModuleOff label="Jobs" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const all = !ctx.current;
   const statuses = view === 'active' ? ACTIVE : view === 'pipeline' ? ['enquiry', 'quoted'] : view === 'done' ? ['completed', 'cancelled'] : JOB_STATUSES.map((s) => s.key);
   const rows = await readScope(ctx, (tx) => tx.select({ j: jobs, c: contacts }).from(jobs)

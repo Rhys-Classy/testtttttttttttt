@@ -5,7 +5,7 @@ import { contacts, conversations, messages, messageTemplates } from '@/db/schema
 import { isUuid } from '@/db/context';
 import { pgArray } from '@/db/sql';
 import { formatDateTime, relativeTime } from '@/lib/dates';
-import { businessById, readScope, requireContext } from '@/server/context';
+import { can, businessById, readScope, requireContext } from '@/server/context';
 import { contactName } from '@/server/services/crm';
 import { qs, sp1, type SP } from '@/server/page-helpers';
 import { Tabs } from '@/components/ui/list';
@@ -17,12 +17,15 @@ import { cn } from '@/lib/cn';
 import { Composer, ThreadActions } from './thread-client';
 import { ComposeToClient } from './compose-to';
 
+import { NoAccess } from '@/components/no-access';
+
 export const metadata = { title: 'Inbox' };
 
 const CHANNEL_ICON = { sms: MessageSquare, email: Mail, call: Phone, chat: MessageSquare, facebook: MessageSquare, instagram: MessageSquare } as const;
 
 export default async function InboxPage({ searchParams }: { searchParams: SP }) {
   const ctx = await requireContext();
+  if (!can(ctx, 'inbox.view')) return <NoAccess what="the inbox" />;
   const p = await searchParams;
   const filter = sp1(p.filter) ?? 'open';
   const b = sp1(p.b);

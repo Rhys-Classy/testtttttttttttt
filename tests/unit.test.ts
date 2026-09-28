@@ -171,3 +171,31 @@ describe('contacts + invoices helpers', () => {
     expect(deriveInvoiceStatus({ ...base, status: 'draft' }, '2026-10-05')).toBe('draft');
   });
 });
+
+describe('audit log sentences', () => {
+  const row = (action: string, extra: Partial<import('@/lib/audit').AuditRow> = {}) =>
+    ({ action, entityType: action.split('.')[0], entityLabel: null, actor: 'user', actorLabel: null, actorName: 'Rhys', data: {}, ...extra });
+  it('reads like a person wrote it', async () => {
+    const { auditSentence, auditDetails, auditActor } = await import('@/lib/audit');
+    expect(auditSentence(row('invoice.sent', { entityLabel: 'INV-1042' }))).toBe('Sent invoice INV-1042');
+    expect(auditSentence(row('quote.accepted', { entityLabel: 'Q-1001', data: { changed: { accepted_by_name: [null, 'Sarah'] } } }))).toBe('Quote Q-1001 accepted by Sarah');
+    expect(auditSentence(row('business_member.created', { entityLabel: 'Sam', data: { changed: { role: 'Staff' } } }))).toBe('Gave Sam the Staff role');
+    expect(auditSentence(row('integration.created', { entityLabel: 'stripe' }))).toBe('Connected Stripe');
+    expect(auditSentence(row('auth.login'))).toBe('Logged in');
+    expect(auditSentence(row('contact.updated', { entityLabel: 'John Smith', data: { changed: { email: ['a@x.au', 'b@x.au'], phone: [null, '0400'] } } }))).toBe('Updated John Smith: email, phone');
+    expect(auditDetails({ data: { changed: { total_cents: [10000, 12500] } } })).toEqual(['total: $100.00 → $125.00']);
+    expect(auditActor({ actor: 'api', actorLabel: 'Zapier', actorName: null })).toBe('API key “Zapier”');
+    expect(auditActor({ actor: 'public', actorLabel: null, actorName: null })).toBe('Customer (online)');
+  });
+});
+
+describe('message delivery retries', () => {
+  it('retries hiccups but not setup problems', async () => {
+    const { isPermanentFailure } = await import('@/server/services/delivery');
+    expect(isPermanentFailure('connect ETIMEDOUT 1.2.3.4:465')).toBe(false);
+    expect(isPermanentFailure('Twilio 503 Service Unavailable')).toBe(false);
+    expect(isPermanentFailure('No email provider connected for this business.')).toBe(true);
+    expect(isPermanentFailure('No recipient address.')).toBe(true);
+    expect(isPermanentFailure('Invalid login: 535 Authentication failed')).toBe(true);
+  });
+});

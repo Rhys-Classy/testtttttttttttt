@@ -71,6 +71,7 @@ export const quotes = pgTable('quotes', {
   uniqueIndex('quotes_number_uq').on(t.subAccountId, t.number),
   uniqueIndex('quotes_public_token_uq').on(t.publicToken),
   index('quotes_status_idx').on(t.subAccountId, t.status),
+  index('quotes_contact_idx').on(t.subAccountId, t.contactId),
 ]);
 
 const lineItemColumns = () => ({
@@ -178,6 +179,7 @@ export const payments = pgTable('payments', {
   uniqueIndex('payments_provider_payment_uq').on(t.subAccountId, t.provider, t.providerPaymentId),
   index('payments_invoice_idx').on(t.subAccountId, t.invoiceId),
   index('payments_paid_at_idx').on(t.subAccountId, t.paidAt),
+  index('payments_contact_idx').on(t.subAccountId, t.contactId),
 ]);
 
 /** Inbound provider webhook log. Unique (provider, event id) makes processing idempotent. */

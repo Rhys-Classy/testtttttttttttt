@@ -10,7 +10,7 @@ import { ContactPicker } from '@/components/contact-picker';
 import { Field, FormError, Input, Select, Textarea } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/toast';
-import type { ShellBusiness } from './types';
+import type { ShellBusiness, ShellData } from './types';
 
 const KINDS: { kind: QuickKind; label: string; icon: React.ComponentType<{ className?: string }>; module?: string }[] = [
   { kind: 'task', label: 'Task', icon: CheckSquare },
@@ -37,7 +37,7 @@ function todayLocal(offsetDays = 0) {
 }
 
 /** Persistent "+" — add anything in two taps, with as few fields as possible. */
-export function QuickAdd({ businesses, currentId }: { businesses: ShellBusiness[]; currentId: string | null }) {
+export function QuickAdd({ businesses, currentId, allowed }: { businesses: ShellBusiness[]; currentId: string | null; allowed: ShellData['can'] }) {
   const [menu, setMenu] = useState(false);
   const [kind, setKind] = useState<QuickKind | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +47,11 @@ export function QuickAdd({ businesses, currentId }: { businesses: ShellBusiness[
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const scope = currentId ? businesses.filter((b) => b.id === currentId) : businesses;
-  const available = KINDS.filter((k) => !k.module || scope.some((b) => b.enabledModules.includes(k.module!)));
+  const PERM_KEY: Record<QuickKind, keyof ShellData['can']> = {
+    task: 'tasks', lead: 'leads', contact: 'contacts', appointment: 'appointments', quote: 'quotes', invoice: 'invoices',
+    payment: 'payments', deal: 'deals', job: 'jobs', note: 'notes',
+  };
+  const available = KINDS.filter((k) => allowed[PERM_KEY[k.kind]] && (!k.module || scope.some((b) => b.enabledModules.includes(k.module!))));
 
   useEffect(() => {
     const onOpen = (e: Event) => {

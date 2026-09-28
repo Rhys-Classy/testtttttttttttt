@@ -31,6 +31,12 @@ export async function resolveSmsProvider(tx: Tx, scope: Scope): Promise<SmsProvi
   return null;
 }
 
+const MAX_ATTEMPTS = 4;
+
+export function isPermanentFailure(error: string | null) {
+  return !!error && /no recipient|no (email|sms) provider|not supported|invalid.*(address|number)|unsubscribed|opted out|authenticat|credentials|not a valid/i.test(error);
+}
+
 /**
  * Worker: send queued + due scheduled messages for one business. Claiming and
  * recording happen in short transactions; the network call happens between them.
@@ -75,9 +81,14 @@ export async function deliverDueMessages(subAccountId: string, limit = 25): Prom
       error = e instanceof Error ? e.message : String(e);
       failed++;
     }
+    // Network/provider hiccups are retried (1, 2, 4 minutes); missing setup or a bad address is not.
+    const attempts = m.attempts + 1;
+    const retry = !result && attempts < MAX_ATTEMPTS && !isPermanentFailure(error);
     await withSystem(subAccountId, (tx) => tx.update(messages).set(result
-      ? { status: 'sent', sentAt: new Date(), provider: result.provider, providerMessageId: result.providerMessageId ?? null, error: null }
-      : { status: 'failed', error })
+      ? { status: 'sent', sentAt: new Date(), provider: result.provider, providerMessageId: result.providerMessageId ?? null, error: null, attempts }
+      : retry
+        ? { status: 'scheduled', scheduledAt: new Date(Date.now() + 2 ** (attempts - 1) * 60_000), error: `Retrying: ${error}`, attempts }
+        : { status: 'failed', error, attempts })
       .where(and(eq(messages.subAccountId, subAccountId), eq(messages.id, m.id))));
   }
   return { sent, failed };

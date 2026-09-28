@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getAppContext } from '@/server/context';
+import { can, getAppContext } from '@/server/context';
 import { runAssistant } from '@/server/assistant/run';
 
 const Body = z.object({
@@ -10,6 +10,7 @@ const Body = z.object({
 export async function POST(req: Request) {
   const ctx = await getAppContext();
   if (!ctx) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
+  if (!can(ctx, 'ai.use')) return NextResponse.json({ text: 'Your role doesn’t include the AI assistant. Ask the account owner if you need it.', pending: [], toolsUsed: [] });
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Bad request' }, { status: 400 });
   const reply = await runAssistant(ctx, parsed.data.messages);

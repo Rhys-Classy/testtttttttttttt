@@ -2,7 +2,7 @@ import { and, isNull, or, eq, sql } from 'drizzle-orm';
 import { notifications } from '@/db/schema';
 import { MODULES } from '@/lib/modules/registry';
 import { tzOffsetMinutes } from '@/lib/dates';
-import { readScope, requireContext } from '@/server/context';
+import { can, canAdminister, readScope, requireContext } from '@/server/context';
 import { logout } from '@/server/auth';
 import { redirect } from 'next/navigation';
 import { Sidebar } from '@/components/shell/sidebar';
@@ -24,7 +24,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const ctx = await requireContext();
   const scope = ctx.current ? [ctx.current] : ctx.businesses;
   const enabled = new Set(scope.flatMap((b) => b.enabledModules));
-  const nav = MODULES.filter((m) => m.core || enabled.has(m.key)).map((m) => ({
+  // A module shows when it's switched on AND the user's role can see it in a business in view.
+  const nav = MODULES.filter((m) => (m.core || enabled.has(m.key)) && can(ctx, m.permission)).map((m) => ({
     key: m.key,
     label: m.key === 'crm' ? (ctx.current?.terminology?.contacts ?? m.label) : m.key === 'jobs' ? (ctx.current?.terminology?.jobs ?? m.label) : m.label,
     href: m.href, icon: m.icon, group: m.group,
@@ -41,7 +42,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     currentId: ctx.current?.id ?? null,
     nav,
     unread,
-    isAccountAdmin: ctx.isAccountAdmin,
+    isOwner: ctx.isOwner,
+    canAdminister: canAdminister(ctx),
+    can: {
+      contacts: can(ctx, 'contacts.edit'), leads: can(ctx, 'sales.edit'), deals: can(ctx, 'sales.edit'), tasks: can(ctx, 'tasks.edit'),
+      appointments: can(ctx, 'calendar.edit'), quotes: can(ctx, 'quotes.edit'), invoices: can(ctx, 'invoices.edit'),
+      payments: can(ctx, 'payments.record'), notes: can(ctx, 'contacts.edit'), jobs: can(ctx, 'jobs.edit'), ai: can(ctx, 'ai.use'),
+    },
     tzOffsetMinutes: tzOffsetMinutes(new Date(), ctx.tz),
   };
   return (
@@ -52,9 +59,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <main className="mx-auto max-w-6xl px-4 pb-32 pt-5 md:px-8 md:pb-16">{children}</main>
       </div>
       <MobileNav data={data} logout={logoutAction} />
-      <QuickAdd businesses={data.businesses} currentId={data.currentId} />
+      <QuickAdd businesses={data.businesses} currentId={data.currentId} allowed={data.can} />
       <CommandPalette data={data} />
-      <AssistantPanel currentBusiness={ctx.current?.name ?? null} />
+      {data.can.ai ? <AssistantPanel currentBusiness={ctx.current?.name ?? null} /> : null}
       <Toaster />
     </div>
   );

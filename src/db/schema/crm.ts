@@ -55,6 +55,7 @@ export const contacts = pgTable('contacts', {
   index('contacts_email_idx').on(t.subAccountId, t.email),
   index('contacts_phone_idx').on(t.subAccountId, t.phone),
   index('contacts_company_idx').on(t.subAccountId, t.companyId),
+  index('contacts_owner_idx').on(t.subAccountId, t.ownerUserId),
 ]);
 
 /** Notes can hang off any record (contact, deal, job, invoice...). */
@@ -71,6 +72,7 @@ export const notes = pgTable('notes', {
 }, (t) => [
   uniqueIndex('notes_tenant_uq').on(t.subAccountId, t.id),
   index('notes_entity_idx').on(t.subAccountId, t.entityType, t.entityId),
+  index('notes_contact_idx').on(t.subAccountId, t.contactId),
 ]);
 
 /** Timeline of everything that happened to a contact/record. Written by services, never edited. */
@@ -116,6 +118,7 @@ export const leads = pgTable('leads', {
   uniqueIndex('leads_tenant_uq').on(t.subAccountId, t.id),
   index('leads_status_idx').on(t.subAccountId, t.status),
   index('leads_contact_idx').on(t.subAccountId, t.contactId),
+  index('leads_assigned_idx').on(t.subAccountId, t.assignedUserId),
 ]);
 
 export const pipelines = pgTable('pipelines', {
@@ -170,6 +173,7 @@ export const deals = pgTable('deals', {
   uniqueIndex('deals_tenant_uq').on(t.subAccountId, t.id),
   index('deals_stage_idx').on(t.subAccountId, t.pipelineId, t.stageId),
   index('deals_contact_idx').on(t.subAccountId, t.contactId),
+  index('deals_assigned_idx').on(t.subAccountId, t.assignedUserId),
 ]);
 
 export type CustomFieldType =

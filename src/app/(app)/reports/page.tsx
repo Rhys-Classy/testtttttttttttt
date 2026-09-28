@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { addDaysKey, dayRange, formatDate, todayKey } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
-import { businessById, readScope, requireContext } from '@/server/context';
+import { businessById, readScope, requireContext, can } from '@/server/context';
 import { getReport } from '@/server/queries/reports';
 import { getBusinessSummaries } from '@/server/queries/dashboard';
 import { moduleScope, qs, sp1, type SP } from '@/server/page-helpers';
@@ -27,7 +27,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: SP }
   const p = await searchParams;
   const b = sp1(p.b);
   const scope = moduleScope(ctx, 'reports', b);
-  if (!scope.businesses.length) return <ModuleOff label="Reports" business={ctx.current?.name} />;
+  // Money figures need reports.financial in every business being reported on.
+  const financial = scope.ids.length > 0 && scope.ids.every((id) => can(ctx, 'reports.financial', id));
+  if (!scope.businesses.length) return <ModuleOff label="Reports" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const tz = ctx.tz;
   const today = todayKey(tz);
   const range = sp1(p.range) ?? 'month';
@@ -74,6 +76,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: SP }
       </div>
       {!ctx.current ? <BusinessFilter businesses={scope.businesses} active={b} hrefFor={(id) => `/reports${qs(base, { b: id })}`} /> : null}
 
+      {financial ? (
       <Card>
         <CardHeader title="Revenue" subtitle="Money received (net of refunds)" />
         <CardBody className="space-y-5">
@@ -91,8 +94,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: SP }
           </div>
         </CardBody>
       </Card>
+      ) : null}
 
-      {cards.length ? (
+      {financial && cards.length ? (
         <Card>
           <CardHeader title="By business" subtitle="This month" />
           <CardBody className="divide-y divide-border">

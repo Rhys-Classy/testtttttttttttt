@@ -32,8 +32,8 @@ async function insertUser(pool: pg.Pool, label: string) {
 /**
  * Two businesses under one master account + a separate account:
  *  owner    - account owner (sees A and B)
- *  staff    - staff member of A only
- *  viewer   - viewer of B only (read-only)
+ *  staff    - Staff role (assigned-only) in A only
+ *  viewer   - Viewer role (read-only) in B only
  *  outsider - owner of a completely different account
  */
 export async function createFixture(): Promise<Fixture> {
@@ -55,7 +55,11 @@ export async function createFixture(): Promise<Fixture> {
     const bizA = await makeBusiness(ownerId, accountId, 'Alpha Kitchens');
     const bizB = await makeBusiness(ownerId, accountId, 'Bravo Clothing');
     const otherBiz = await makeBusiness(outsiderId, otherAccountId, 'Outsider Co');
-    await pool.query(`insert into sub_account_members (sub_account_id, user_id, role) values ($1, $2, 'staff'), ($3, $4, 'viewer')`, [bizA, staffId, bizB, viewerId]);
+    await pool.query(
+      `insert into sub_account_members (sub_account_id, user_id, role_id)
+       select $1::uuid, $2::uuid, (select id from roles where account_id = $5 and key = 'staff')
+       union all select $3::uuid, $4::uuid, (select id from roles where account_id = $5 and key = 'viewer')`,
+      [bizA, staffId, bizB, viewerId, accountId]);
     return { ownerId, staffId, viewerId, outsiderId, accountId, otherAccountId, bizA, bizB, otherBiz };
   } finally {
     await pool.end();
@@ -72,6 +76,32 @@ async function makeBusiness(userId: string, accountId: string, name: string) {
 export function asUser<T>(userId: string, subAccountId: string | string[], fn: (tx: Tx, scope: Scope) => Promise<T>) {
   const ids = Array.isArray(subAccountId) ? subAccountId : [subAccountId];
   return withContext({ actor: 'user', userId, subAccountIds: ids }, (tx) => fn(tx, { subAccountId: ids[0], userId, actor: 'user' }));
+}
+
+/** Give a user a role (by key) in a business. */
+export async function grantRole(userId: string, subAccountId: string, roleKey: string) {
+  const pool = admin();
+  try {
+    await pool.query(
+      `insert into sub_account_members (sub_account_id, user_id, role_id)
+       select s.id, $2::uuid, r.id from sub_accounts s join roles r on r.account_id = s.account_id and r.key = $3 where s.id = $1
+       on conflict (sub_account_id, user_id) do update set role_id = excluded.role_id`,
+      [subAccountId, userId, roleKey]);
+  } finally {
+    await pool.end();
+  }
+}
+
+/** A new user who is a plain member of the fixture's account (no business access yet). */
+export async function createMember(accountId: string, label: string) {
+  const pool = admin();
+  try {
+    const id = await insertUser(pool, label);
+    await pool.query(`insert into account_members (account_id, user_id, role) values ($1, $2, 'member')`, [accountId, id]);
+    return id;
+  } finally {
+    await pool.end();
+  }
 }
 
 export function asSystem<T>(subAccountId: string, fn: (tx: Tx, scope: Scope) => Promise<T>) {

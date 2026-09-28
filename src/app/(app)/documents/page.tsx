@@ -20,7 +20,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: SP
   const ctx = await requireContext();
   const p = await searchParams;
   const scope = moduleScope(ctx, 'documents', sp1(p.b));
-  if (!scope.businesses.length) return <ModuleOff label="Documents" business={ctx.current?.name} />;
+  if (!scope.businesses.length) return <ModuleOff label="Documents" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const rows = await readScope(ctx, (tx) => tx.select().from(documents).where(sql`${documents.subAccountId} = any(${pgArray(scope.ids)})`).orderBy(desc(documents.createdAt)).limit(300));
   return (
     <div>

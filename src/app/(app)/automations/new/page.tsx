@@ -11,8 +11,8 @@ export const metadata = { title: 'New automation' };
 export default async function NewAutomationPage({ searchParams }: { searchParams: SP }) {
   const ctx = await requireContext();
   const p = await searchParams;
-  const scope = moduleScope(ctx, 'automations');
-  if (!scope.businesses.length) return <ModuleOff label="Automations" business={ctx.current?.name} />;
+  const scope = moduleScope(ctx, 'automations', undefined, 'automations.edit');
+  if (!scope.businesses.length) return <ModuleOff label="Automations" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const tpl = WORKFLOW_TEMPLATES.find((t) => t.key === sp1(p.template));
   const ctxBy = await builderContext(ctx, scope.ids);
   return (

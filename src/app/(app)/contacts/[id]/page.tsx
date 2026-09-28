@@ -17,6 +17,7 @@ import { TaskRow } from '@/components/dashboard/task-row';
 import { ContactForm, NoteBox, TagEditor } from './client-bits';
 import { ContactQuickButtons } from './quick-buttons';
 import { DocumentUpload } from '@/components/document-upload';
+import { RecordHistory } from '@/components/audit/record-history';
 
 export default async function ContactPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -178,6 +179,8 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
               </ul>
             </CardBody>
           </Card>
+
+          <RecordHistory ctx={ctx} entityId={c.id} subAccountId={c.subAccountId} />
         </div>
       </div>
     </div>

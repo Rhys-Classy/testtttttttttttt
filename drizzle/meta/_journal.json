@@ -15,6 +15,27 @@
       "when": 1790607986283,
       "tag": "0001_security",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790613720692,
+      "tag": "0002_roles_mfa_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790613766120,
+      "tag": "0003_permissions_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790615575835,
+      "tag": "0004_message_retries",
+      "breakpoints": true
     }
   ]
 }

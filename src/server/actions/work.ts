@@ -18,7 +18,7 @@ function local(ctx: Awaited<ReturnType<typeof requireContext>>, subAccountId: st
 
 export async function jobStatusAction(subAccountId: string, id: string, status: JobStatus) {
   const ctx = await requireContext();
-  const res = await attempt(() => inBusiness(ctx, subAccountId, (tx, s) => setJobStatus(tx, s, id, status)).then(() => undefined), 'Updated');
+  const res = await attempt(() => inBusiness(ctx, subAccountId, 'jobs.edit', (tx, s) => setJobStatus(tx, s, id, status), { visible: [['jobs', id]] }).then(() => undefined), 'Updated');
   revalidatePath(`/jobs/${id}`);
   revalidatePath('/jobs');
   return res;
@@ -28,9 +28,9 @@ export async function scheduleJobAction(fd: FormData) {
   const ctx = await requireContext();
   const subAccountId = str(fd, 'subAccountId');
   const id = str(fd, 'id');
-  const res = await attempt(() => inBusiness(ctx, subAccountId, (tx, s) => scheduleJob(tx, s, id,
+  const res = await attempt(() => inBusiness(ctx, subAccountId, 'jobs.edit', (tx, s) => scheduleJob(tx, s, id,
     local(ctx, subAccountId, str(fd, 'startDate'), str(fd, 'startTime')),
-    local(ctx, subAccountId, str(fd, 'endDate') || str(fd, 'startDate'), str(fd, 'endTime') || '16:00'))).then(() => undefined), 'Scheduled');
+    local(ctx, subAccountId, str(fd, 'endDate') || str(fd, 'startDate'), str(fd, 'endTime') || '16:00')), { visible: [['jobs', id]] }).then(() => undefined), 'Scheduled');
   revalidatePath(`/jobs/${id}`);
   revalidatePath('/calendar');
   return res;
@@ -40,16 +40,16 @@ export async function jobNotesAction(fd: FormData) {
   const ctx = await requireContext();
   const subAccountId = str(fd, 'subAccountId');
   const id = str(fd, 'id');
-  const res = await attempt(() => inBusiness(ctx, subAccountId, async (tx, s) => {
+  const res = await attempt(() => inBusiness(ctx, subAccountId, 'jobs.edit', async (tx, s) => {
     await tx.update(jobs).set({ notes: optStr(fd, 'notes'), updatedAt: new Date() }).where(and(eq(jobs.subAccountId, s.subAccountId), eq(jobs.id, id)));
-  }), 'Saved');
+  }, { visible: [['jobs', id]] }), 'Saved');
   revalidatePath(`/jobs/${id}`);
   return res;
 }
 
 export async function appointmentStatusAction(subAccountId: string, id: string, status: 'confirmed' | 'completed' | 'cancelled' | 'no_show') {
   const ctx = await requireContext();
-  const res = await attempt(() => inBusiness(ctx, subAccountId, (tx, s) => (status === 'cancelled' ? cancelAppointment(tx, s, id) : updateAppointment(tx, s, id, { status }))).then(() => undefined), 'Updated');
+  const res = await attempt(() => inBusiness(ctx, subAccountId, 'calendar.edit', (tx, s) => (status === 'cancelled' ? cancelAppointment(tx, s, id) : updateAppointment(tx, s, id, { status })), { visible: [['appointments', id]] }).then(() => undefined), 'Updated');
   revalidatePath('/calendar');
   revalidatePath('/', 'layout');
   return res;
@@ -58,21 +58,21 @@ export async function appointmentStatusAction(subAccountId: string, id: string, 
 export async function rescheduleAppointmentAction(subAccountId: string, id: string, startIso: string, durationMinutes: number) {
   const ctx = await requireContext();
   const start = new Date(startIso);
-  const res = await attempt(() => inBusiness(ctx, subAccountId, (tx, s) => updateAppointment(tx, s, id, { startsAt: start, endsAt: new Date(start.getTime() + durationMinutes * 60_000) })).then(() => undefined), 'Moved');
+  const res = await attempt(() => inBusiness(ctx, subAccountId, 'calendar.edit', (tx, s) => updateAppointment(tx, s, id, { startsAt: start, endsAt: new Date(start.getTime() + durationMinutes * 60_000) }), { visible: [['appointments', id]] }).then(() => undefined), 'Moved');
   revalidatePath('/calendar');
   return res;
 }
 
 export async function addStaffAction(fd: FormData) {
   const ctx = await requireContext();
-  const res = await attempt(() => inBusiness(ctx, str(fd, 'subAccountId'), (tx, s) => createStaffMember(tx, s, { name: str(fd, 'name'), email: optStr(fd, 'email'), phone: optStr(fd, 'phone'), role: optStr(fd, 'role') })).then(() => undefined), 'Added');
+  const res = await attempt(() => inBusiness(ctx, str(fd, 'subAccountId'), 'staff.edit', (tx, s) => createStaffMember(tx, s, { name: str(fd, 'name'), email: optStr(fd, 'email'), phone: optStr(fd, 'phone'), role: optStr(fd, 'role') })).then(() => undefined), 'Added');
   revalidatePath('/staff');
   return res;
 }
 
 export async function staffActiveAction(subAccountId: string, id: string, active: boolean) {
   const ctx = await requireContext();
-  const res = await attempt(() => inBusiness(ctx, subAccountId, (tx, s) => setStaffActive(tx, s, id, active)));
+  const res = await attempt(() => inBusiness(ctx, subAccountId, 'staff.edit', (tx, s) => setStaffActive(tx, s, id, active), { visible: [['staff_members', id]] }));
   revalidatePath('/staff');
   return res;
 }

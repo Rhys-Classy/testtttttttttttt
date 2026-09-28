@@ -10,7 +10,7 @@ import { env } from '@/lib/env';
 import { formatMoney } from '@/lib/money';
 import { calculateDocument, type LineInput } from '@/lib/tax';
 import {
-  Scope, ValidationError, audit, businessTax, byTenant, cleanStr, emit, getBusiness, logActivity, must, nextNumber,
+  Scope, ValidationError, businessTax, byTenant, cleanStr, emit, getBusiness, logActivity, must, nextNumber,
   type Business,
 } from './_common';
 import { contactName, getContact, markDealOutcome, updateContact } from './crm';
@@ -262,7 +262,6 @@ export async function acceptQuote(tx: Tx, scope: Scope, quoteId: string, opts: {
     body: `${formatMoney(quote.totalCents, quote.currency)}${opts.acceptedByName ? ` — ${opts.acceptedByName}` : ''}`,
     link: `/quotes/${quoteId}`,
   });
-  await audit(tx, scope, 'quote.accept', 'quote', quoteId, { acceptedByName: opts.acceptedByName });
   return { quote: row, jobId, invoiceId };
 }
 
@@ -438,7 +437,6 @@ export async function cancelInvoice(tx: Tx, scope: Scope, invoiceId: string) {
   if (inv.amountPaidCents > 0) throw new ValidationError('Refund payments before cancelling this invoice.');
   const [row] = await tx.update(invoices).set({ status: 'cancelled', cancelledAt: new Date(), updatedAt: new Date() })
     .where(byTenant(invoices, scope, invoiceId)).returning();
-  await audit(tx, scope, 'invoice.cancel', 'invoice', invoiceId);
   return row;
 }
 
@@ -604,7 +602,6 @@ export async function refundManualPayment(tx: Tx, scope: Scope, paymentId: strin
   const [row] = await tx.update(payments).set({ refundedCents: p.amountCents, status: 'refunded', updatedAt: new Date() }).where(byTenant(payments, scope, p.id)).returning();
   if (p.invoiceId) await reconcileInvoice(tx, scope, p.invoiceId);
   await emit(tx, scope, 'payment.refunded', { entityType: 'payment', entityId: p.id, contactId: p.contactId, payload: { refundedCents: p.amountCents } });
-  await audit(tx, scope, 'payment.refund', 'payment', p.id, { amountCents: p.amountCents });
   return row;
 }
 

@@ -39,32 +39,40 @@ The five businesses are **seed data**, not code. Add, rename or archive business
 | **Reports** | Revenue (12-month chart), sales, leads by source, customers, campaigns — per business or combined, AU financial-year presets |
 | **AI assistant** | *"What should I do today?"*, *"Who owes me money?"*, *"Which business has the most overdue invoices?"* — runs only through permission-checked tools; invoices/quotes/bookings/messages wait for your **Confirm** tap |
 | **Mobile** | Bottom nav (Home · Inbox · Tasks · Calendar · Contacts · More), thumb-sized targets, no horizontal scrolling |
+| **Team & roles** | Owner, Admin, Manager, Staff (only what's assigned to them), Accountant, Viewer + your own roles. Editable permissions. Access to one, several or all businesses |
+| **Security** | Two-step verification (authenticator app + recovery codes, can be required for everyone), device list + sign-out, idle timeout, audit log of who changed what |
+| **REST API** | Per-business API keys with their own permissions for Zapier / your website, plus a calendar feed (see API.md) |
+| **Easy on the eyes** | Dark theme by default (soft charcoal, no pure white), light or match-device in *My account* |
 
 ---
 
-## Data isolation (the important bit)
+## Data isolation and permissions (the important bit)
 
 ```
-request ──► session cookie ──► user
+request ──► proxy (CSRF, headers) ──► session (+ two-step) ──► user + role per business
                 │
                 ▼
    BEGIN;  SET LOCAL app.user_id, app.actor, app.sub_account_ids   ◄── one transaction per unit of work
                 │
                 ▼
    Postgres row level security on every business-owned table:
-     visible rows  = sub_account_id ∈ (requested ∩ businesses the user is a member of)
-     writes        = …and the membership isn't read-only
-     system/public = pinned to exactly ONE business
+     visible rows  = business ∈ (requested ∩ the user's businesses)  AND  role has the view permission
+                     (Staff: only rows assigned to them)
+     writes        = app.has_permission(business, 'invoices.edit') checked in the database first,
+                     then the work runs pinned to exactly ONE business, logged against the user
                 │
                 ▼
    composite FKs (sub_account_id, x_id) → a row can never point at another business's row
+   audit triggers → append-only history of every important change
 ```
 
-- The app connects as **`bos_app`**: not a superuser, no `BYPASSRLS`, owns no tables. Every query is filtered by the database, not by the UI.
-- Business membership is checked **inside Postgres** (`app.visible_sub_account_ids()`), so a forged business id in a cookie or form returns nothing.
-- Background work (automations, webhooks, reminders) and public links (invoice, quote, form, landing page) run pinned to a **single** business resolved from an unguessable token or integration id.
-- Integration secrets (Stripe keys, SMTP/Twilio passwords, the AI key) are **AES-256-GCM encrypted** at rest and never sent to the browser.
-- `tests/isolation.test.ts` proves it: cross-business reads/writes, forged context, viewer read-only, FK blocking, every tenant table has RLS, integration ownership, public-token scoping.
+- The app connects as **`bos_app`**: not a superuser, no `BYPASSRLS`, owns no tables, can't read password hashes or MFA secrets.
+- Membership **and permissions** are checked **inside Postgres**, so a forged business id or a missing permission returns nothing.
+- Background work and public links run pinned to a **single** business resolved from an unguessable token, integration id or API key.
+- Integration secrets are **AES-256-GCM encrypted** at rest and never sent to the browser.
+- Proven by tests: `isolation.test.ts` (Business A can never reach Business B), `permissions.test.ts` (roles, Staff assigned-only, no privilege escalation, tamper-proof audit), `api.test.ts` (keys, CSRF, headers), `auth.test.ts` (TOTP vectors, replay, recovery codes, sessions).
+
+Full details: **ARCHITECTURE.md** · **DATABASE.md** · **API.md** · **INTEGRATIONS.md** · **ROADMAP.md**.
 
 ---
 
@@ -104,23 +112,20 @@ Put it behind HTTPS (Caddy, Cloudflare Tunnel, nginx). `APP_URL` must be the pub
 
 ## Connecting each business
 
-*Settings → Integrations* (open the business first — each one has its own):
+*Settings → Integrations* (open the business first — each one has its own Stripe, email, SMS and website-form connection; the AI key is account-wide). Step-by-step setup and what's built vs planned: **INTEGRATIONS.md**.
 
-| Integration | Setup |
-|---|---|
-| **Stripe** | Paste the secret (or restricted) key. Copy the webhook URL shown into Stripe → Developers → Webhooks, events `checkout.session.completed`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`, and paste the signing secret back. Invoices then get **Pay Now**. Webhooks are signature-verified and idempotent; payment status never relies on the browser redirect |
-| **Email (SMTP)** | Google Workspace/Gmail app password (`smtp.gmail.com:465`), Microsoft 365 (`smtp.office365.com:587`) or any transactional provider |
-| **SMS (Twilio)** | Account SID, auth token, number. Set the shown URL as the number's incoming-message webhook — replies land in the Inbox, STOP opts out |
-| **Website forms** | POST any form (WordPress, Webflow, GoHighLevel, Zapier) to the shown URL — creates a lead + contact and fires *Form submitted* automations |
-| **AI assistant** | Account-wide (*Whole account* section): Claude API key |
-| Gmail / Google Calendar OAuth, Microsoft, Facebook/Instagram | Provider slots and interfaces are in place (`src/lib/integrations`); marked *coming soon* in the UI |
+## First things to do after logging in
+
+1. *My account* → turn on **two-step verification**, then (owner) tick **Require two-step verification** for everyone.
+2. *Team* → add people with a role per business (e.g. your Head Installer as **Staff** in Classy Kitchen Facelifts only).
+3. *Settings → Integrations* per business → Stripe, email, SMS.
 
 ---
 
 ## Project layout
 
 ```
-drizzle/                    SQL migrations (0000 schema, 0001 security: roles, RLS, tenant FKs, SECURITY DEFINER entry points)
+drizzle/                    SQL migrations (0000 schema, 0001 security, 0002 roles/MFA/API keys, 0003 permissions + audit triggers, 0004 retries)
 src/db/                     schema (Drizzle), context (withContext / withSystem / withPublic), seed
 src/lib/                    tax (GST layer), dates (timezones), money, commands (NL parser), automation types,
                             integrations (Stripe, SMTP, Twilio), modules registry, crypto, storage
@@ -130,7 +135,7 @@ src/server/actions/         server actions (auth + business check, then a servic
 src/server/assistant/       AI assistant: tool definitions + tool loop
 src/worker/                 background worker
 src/app/(app)/              the app       src/app/(public)/   invoice, quote, form, landing page
-tests/                      isolation, flows (quote→job→invoice, Stripe webhooks, automations…), unit, command parser
+tests/                      isolation, permissions, auth/MFA, API/CSRF, flows (quote→job→invoice, Stripe, automations…), unit, command parser
 ```
 
 ## Checks
@@ -145,8 +150,4 @@ npm run build
 
 ## Status
 
-| | |
-|---|---|
-| ✅ Built and tested | Everything in *What's in it* above, multi-business isolation, Stripe (per-business keys, Checkout, webhooks, refunds), SMTP email, Twilio SMS, website webhook, AI assistant, worker, Docker, CI |
-| 🔌 Architected, needs credentials/app registration | Gmail + Google Calendar OAuth, Microsoft 365 mail/calendar, Facebook Messenger / Lead Ads, Instagram DMs, S3 storage, Stripe Connect onboarding flow (connected-account id already supported) |
-| 🗺️ Next | Per-message email open/click tracking, two-way calendar sync, PDF files attached to emails (customers currently get a link with a print-to-PDF view), Shopify order sync for retail |
+See **ROADMAP.md** for the per-feature Definition-of-Done table and what is clearly not built yet (Gmail/Microsoft OAuth, two-way calendar sync, Facebook/Instagram, password-reset emails, email tracking).

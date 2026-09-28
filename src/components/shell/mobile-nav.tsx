@@ -22,13 +22,16 @@ const PRIMARY = [
 export function MobileNav({ data, logout }: { data: ShellData; logout: () => Promise<void> }) {
   const pathname = usePathname();
   const [more, setMore] = useState(false);
-  const primaryHrefs = new Set(PRIMARY.map((p) => p.href));
+  // Keep the bar to what the role can open (Home is always there).
+  const navHrefs = new Set(data.nav.map((n) => n.href));
+  const primary = PRIMARY.filter((p) => p.href === '/' || navHrefs.has(p.href));
+  const primaryHrefs = new Set(primary.map((p) => p.href));
   const rest = data.nav.filter((n) => !primaryHrefs.has(n.href));
   return (
     <>
       <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur md:hidden" aria-label="Main">
-        <div className="grid grid-cols-6">
-          {PRIMARY.map(({ href, label, icon: I }) => {
+        <div className="grid" style={{ gridTemplateColumns: `repeat(${primary.length + 1}, minmax(0, 1fr))` }}>
+          {primary.map(({ href, label, icon: I }) => {
             const active = isActive(pathname, href);
             return (
               <Link key={href} href={href} className={cn('flex h-16 flex-col items-center justify-center gap-1 text-[11px]', active ? 'font-semibold text-accent' : 'text-muted')}>
@@ -45,7 +48,7 @@ export function MobileNav({ data, logout }: { data: ShellData; logout: () => Pro
       </nav>
       {more ? (
         <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
-          <button className="absolute inset-0 bg-black/40" aria-label="Close" onClick={() => setMore(false)} />
+          <button className="absolute inset-0 bg-backdrop" aria-label="Close" onClick={() => setMore(false)} />
           <div className="pb-safe absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-3xl bg-surface p-4">
             <div className="mb-4 flex items-center justify-between">
               <p className="font-semibold">More</p>

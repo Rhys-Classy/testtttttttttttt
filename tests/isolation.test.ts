@@ -116,15 +116,16 @@ describe('row level security between businesses', () => {
     expect(code).toBe('23503');
   });
 
-  it('every business-owned table has RLS and the tenant policy', async () => {
+  it('every business-owned table has RLS and the restrictive tenant policy', async () => {
     const pool = admin();
     try {
       const { rows } = await pool.query<{ table_name: string; rls: boolean; policies: number }>(`
         select c.table_name, cls.relrowsecurity as rls,
-          (select count(*) from pg_policies p where p.tablename = c.table_name and p.policyname = 'tenant_isolation')::int as policies
+          (select count(*) from pg_policies p where p.tablename = c.table_name and p.policyname = 'tenant_scope' and p.permissive = 'RESTRICTIVE')::int as policies
         from information_schema.columns c
         join pg_class cls on cls.relname = c.table_name and cls.relkind = 'r'
-        where c.table_schema = 'public' and c.column_name = 'sub_account_id' and c.table_name not in ('integrations', 'sub_account_members')`);
+        where c.table_schema = 'public' and c.column_name = 'sub_account_id'
+          and c.table_name not in ('integrations', 'sub_account_members', 'api_keys', 'audit_log')`);
       expect(rows.length).toBeGreaterThan(30);
       const missing = rows.filter((r) => !r.rls || r.policies !== 1).map((r) => r.table_name);
       expect(missing).toEqual([]);

@@ -6,7 +6,8 @@ import { relativeTime } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import { businessById, readScope, requireContext } from '@/server/context';
 import { contactName } from '@/server/services/crm';
-import { moduleScope, qs, sp1, type SP } from '@/server/page-helpers';
+import { moduleScope, qs, sp1, type SP, pageOf, splitPage } from '@/server/page-helpers';
+import { Pager } from '@/components/ui/pager';
 import { PageHeader } from '@/components/ui/page';
 import { Tabs } from '@/components/ui/list';
 import { StatusBadge } from '@/components/ui/badge';
@@ -28,20 +29,22 @@ export default async function LeadsPage({ searchParams }: { searchParams: SP }) 
   const source = sp1(p.source);
   const b = sp1(p.b);
   const scope = moduleScope(ctx, 'leads', b);
-  if (!scope.businesses.length) return <ModuleOff label="Leads" business={ctx.current?.name} />;
+  if (!scope.businesses.length) return <ModuleOff label="Leads" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const all = !ctx.current;
 
-  const { rows, counts } = await readScope(ctx, async (tx) => {
+  const pg = pageOf(p);
+  const { rows: fetched, counts } = await readScope(ctx, async (tx) => {
     const base = [sql`${leads.subAccountId} = any(${pgArray(scope.ids)})`];
     if (source) base.push(eq(leads.source, source as never));
     const statusCond = status === 'open' ? inArray(leads.status, ['new', 'contacted', 'qualified']) : eq(leads.status, status as never);
     return {
       rows: await tx.select({ l: leads, c: contacts }).from(leads)
         .innerJoin(contacts, and(eq(contacts.id, leads.contactId), eq(contacts.subAccountId, leads.subAccountId)))
-        .where(and(...base, statusCond)).orderBy(sql`case ${leads.status} when 'new' then 0 when 'contacted' then 1 else 2 end`, desc(leads.createdAt)).limit(200),
+        .where(and(...base, statusCond)).orderBy(sql`case ${leads.status} when 'new' then 0 when 'contacted' then 1 else 2 end`, desc(leads.createdAt), desc(leads.id)).limit(pg.limit).offset(pg.offset),
       counts: await tx.select({ s: leads.status, n: sql<number>`count(*)` }).from(leads).where(and(...base)).groupBy(leads.status),
     };
   });
+  const { rows, hasNext } = splitPage(fetched);
   const n = (s: string) => Number(counts.find((c) => c.s === s)?.n ?? 0);
   const base = { status: status === 'open' ? undefined : status, source, b };
   const tabs = [
@@ -85,6 +88,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: SP }) 
           ))}
         </ul>
       ) : <EmptyState title="No leads here" body="New enquiries from forms, ads, calls and messages land here automatically." />}
+      <Pager path="/leads" params={p} page={pg.page} hasNext={hasNext} shown={rows.length} />
     </div>
   );
 }

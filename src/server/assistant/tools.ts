@@ -6,7 +6,8 @@ import { pgArray } from '@/db/sql';
 import { activities, contacts, invoices, leads, messages } from '@/db/schema';
 import { addDaysKey, dayRange, formatDate, formatDateTime, monthRange, todayKey, zonedTimeToUtc } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
-import { businessById, inBusiness, readScope, type AppContext } from '@/server/context';
+import { businessById, can, inBusiness, readScope, type AppContext } from '@/server/context';
+import type { Permission } from '@/lib/permissions';
 import { getAttention, getBusinessSummaries, getMoney, getToday } from '@/server/queries/dashboard';
 import { globalSearch } from '@/server/queries/search';
 import { getReport } from '@/server/queries/reports';
@@ -14,7 +15,7 @@ import { contactName } from '@/server/services/crm';
 import { createInvoice, createQuote } from '@/server/services/finance';
 import { createAppointment, createTask } from '@/server/services/work';
 import { queueMessage } from '@/server/services/comms';
-import { ValidationError } from '@/server/services/_common';
+import { ForbiddenError, ValidationError } from '@/server/services/_common';
 
 /**
  * The assistant never touches the database directly. It can only call these tools,
@@ -92,6 +93,31 @@ const schemas = {
 
 export type ToolName = keyof typeof schemas;
 
+/**
+ * What each tool needs. Tools the user's role can't use are not offered to the
+ * model at all, write tools are re-checked before proposing, and the database
+ * checks again when a confirmed action runs.
+ */
+const TOOL_PERMS: Record<ToolName, Permission | null> = {
+  get_attention: null, get_today: null, search: null, get_contact: 'contacts.view',
+  get_money: 'invoices.view', list_invoices: 'invoices.view', list_leads: 'sales.view', get_report: 'reports.view',
+  create_task: 'tasks.edit', create_invoice_draft: 'invoices.edit', create_quote_draft: 'quotes.edit',
+  book_appointment: 'calendar.edit', send_message: 'inbox.send',
+};
+
+/** Tool definitions this user may use in the current view. */
+export function toolsFor(ctx: AppContext) {
+  return TOOL_DEFS.filter((t) => {
+    const perm = TOOL_PERMS[t.name as ToolName];
+    return !perm || can(ctx, perm);
+  });
+}
+
+function assertToolAllowed(ctx: AppContext, tool: ToolName, subAccountId?: string) {
+  const perm = TOOL_PERMS[tool];
+  if (perm && !can(ctx, perm, subAccountId)) throw new ForbiddenError(`Your role doesn't allow that${subAccountId ? ` in ${bizName(ctx, subAccountId)}` : ''}.`);
+}
+
 /** Resolve a business name/id to one the user can see in this context. */
 function resolveBusiness(ctx: AppContext, ref: string | undefined, required = false) {
   if (!ref) {
@@ -127,6 +153,7 @@ export async function runTool(ctx: AppContext, name: string, rawInput: unknown):
   if (!parsed.success) throw new ValidationError(`Invalid input: ${parsed.error.issues.map((i) => `${i.path.join('.')} ${i.message}`).join('; ')}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const input = parsed.data as Record<string, any>;
+  assertToolAllowed(ctx, tool);
   const tz = ctx.tz;
 
   switch (tool) {
@@ -216,10 +243,10 @@ export async function runTool(ctx: AppContext, name: string, rawInput: unknown):
       const dueKey = (input.due_date as string | undefined) ?? todayKey(b!.timezone);
       const [y, m, d] = dueKey.split('-').map(Number);
       const [hh, mm] = ((input.due_time as string | undefined) ?? '09:00').split(':').map(Number);
-      const task = await inBusiness(ctx, b!.id, (tx, s) => createTask(tx, s, {
+      const task = await inBusiness(ctx, b!.id, 'tasks.edit', (tx, s) => createTask(tx, s, {
         title: input.title as string, dueAt: zonedTimeToUtc(y, m, d, hh, mm || 0, b!.timezone), allDay: !input.due_time,
         contactId: (input.contact_id as string | undefined) ?? null, priority: (input.priority as never) ?? 'normal', source: 'assistant',
-      }));
+      }), { visible: [['contacts', (input.contact_id as string | undefined) ?? null]] });
       return { result: { created: true, business: b!.name, task: task.title, due: dueKey } };
     }
     case 'create_invoice_draft':
@@ -227,6 +254,7 @@ export async function runTool(ctx: AppContext, name: string, rawInput: unknown):
     case 'send_message': {
       const c = await contactBusiness(ctx, input.contact_id as string);
       const b = businessById(ctx, c.subAccountId)!;
+      assertToolAllowed(ctx, tool, b.id);
       const summary = tool === 'send_message'
         ? `Send ${input.channel === 'sms' ? 'SMS' : 'email'} to ${contactName(c)}: "${String(input.body).slice(0, 120)}"`
         : `Draft ${tool === 'create_invoice_draft' ? 'invoice' : 'quote'} for ${contactName(c)}: ${money(Math.round((input.amount_dollars as number) * 100))}${input.gst === 'plus' ? ' + GST' : input.gst === 'inc' ? ' inc GST' : ' GST free'} — ${input.description}`;
@@ -235,6 +263,7 @@ export async function runTool(ctx: AppContext, name: string, rawInput: unknown):
     }
     case 'book_appointment': {
       const b = input.contact_id ? businessById(ctx, (await contactBusiness(ctx, input.contact_id as string)).subAccountId)! : resolveBusiness(ctx, input.business as string | undefined, true)!;
+      assertToolAllowed(ctx, tool, b.id);
       const summary = `Book "${input.title}" on ${String(input.start).replace('T', ' at ')} (${input.duration_minutes ?? 60} min)`;
       const pending: PendingAction = { id: crypto.randomUUID(), tool, input: { ...input, business: b.id }, summary, business: b.name };
       return { result: { status: 'awaiting_user_confirmation', summary, business: b.name }, pending };
@@ -255,10 +284,10 @@ export async function executeConfirmedAction(ctx: AppContext, tool: WriteTool, r
       const line = { description: input.description as string, quantity: 1, unitPriceCents: Math.round((input.amount_dollars as number) * 100), taxCode: input.gst === 'free' ? 'GST_FREE' : 'GST' };
       const pricesIncludeTax = input.gst === 'inc';
       if (tool === 'create_invoice_draft') {
-        const inv = await inBusiness(ctx, c.subAccountId, (tx, s) => createInvoice(tx, s, { contactId: c.id, lines: [line], pricesIncludeTax }));
+        const inv = await inBusiness(ctx, c.subAccountId, 'invoices.edit', (tx, s) => createInvoice(tx, s, { contactId: c.id, lines: [line], pricesIncludeTax }), { visible: [['contacts', c.id]] });
         return { message: `Draft invoice ${inv.number} created (${money(inv.totalCents)}).`, href: `/invoices/${inv.id}` };
       }
-      const q = await inBusiness(ctx, c.subAccountId, (tx, s) => createQuote(tx, s, { contactId: c.id, lines: [line], pricesIncludeTax }));
+      const q = await inBusiness(ctx, c.subAccountId, 'quotes.edit', (tx, s) => createQuote(tx, s, { contactId: c.id, lines: [line], pricesIncludeTax }), { visible: [['contacts', c.id]] });
       return { message: `Draft quote ${q.number} created (${money(q.totalCents)}).`, href: `/quotes/${q.id}` };
     }
     case 'book_appointment': {
@@ -266,15 +295,15 @@ export async function executeConfirmedAction(ctx: AppContext, tool: WriteTool, r
       const [date, time] = String(input.start).split('T');
       const [y, m, d] = date.split('-').map(Number);
       const [hh, mm] = time.split(':').map(Number);
-      await inBusiness(ctx, b.id, (tx, s) => createAppointment(tx, s, {
+      await inBusiness(ctx, b.id, 'calendar.edit', (tx, s) => createAppointment(tx, s, {
         title: input.title as string, startsAt: zonedTimeToUtc(y, m, d, hh, mm, b.timezone), durationMinutes: (input.duration_minutes as number | undefined) ?? 60,
         contactId: (input.contact_id as string | undefined) ?? null, location: (input.location as string | undefined) ?? null,
-      }));
+      }), { visible: [['contacts', (input.contact_id as string | undefined) ?? null]] });
       return { message: `Booked in ${b.name}.`, href: `/calendar?d=${date}` };
     }
     case 'send_message': {
       const c = await contactBusiness(ctx, input.contact_id);
-      await inBusiness(ctx, c.subAccountId, (tx, s) => queueMessage(tx, s, { contactId: c.id, channel: input.channel, subject: (input.subject as string | undefined) ?? null, body: input.body as string }));
+      await inBusiness(ctx, c.subAccountId, 'inbox.send', (tx, s) => queueMessage(tx, s, { contactId: c.id, channel: input.channel, subject: (input.subject as string | undefined) ?? null, body: input.body as string }), { visible: [['contacts', c.id]] });
       return { message: `${input.channel === 'sms' ? 'SMS' : 'Email'} queued to ${contactName(c)}.`, href: `/contacts/${c.id}` };
     }
   }

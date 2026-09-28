@@ -9,8 +9,8 @@ export const metadata = { title: 'New campaign' };
 
 export default async function NewCampaignPage() {
   const ctx = await requireContext();
-  const scope = moduleScope(ctx, 'campaigns');
-  if (!scope.businesses.length) return <ModuleOff label="Campaigns" business={ctx.current?.name} />;
+  const scope = moduleScope(ctx, 'campaigns', undefined, 'marketing.edit');
+  if (!scope.businesses.length) return <ModuleOff label="Campaigns" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const optsBy = await campaignOptions(ctx, scope.ids);
   return (
     <div>

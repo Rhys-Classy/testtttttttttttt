@@ -9,9 +9,11 @@ import { toast } from '@/components/toast';
 import { Button, buttonClass } from '@/components/ui/button';
 import { Field, Input, Select } from '@/components/ui/form';
 
-export function InvoiceActions({ inv, link, hasEmail, hasPhone, balance }: {
+export function InvoiceActions({ inv, link, hasEmail, hasPhone, balance, canEdit, canRecord }: {
   inv: { id: string; subAccountId: string; status: string; number: string; amountPaidCents: number };
   link: string; hasEmail: boolean; hasPhone: boolean; balance: string;
+  /** From the user's role; the server checks again. */
+  canEdit: boolean; canRecord: boolean;
 }) {
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -24,21 +26,21 @@ export function InvoiceActions({ inv, link, hasEmail, hasPhone, balance }: {
   const open = !['paid', 'cancelled'].includes(inv.status);
   return (
     <div className="flex flex-wrap gap-2">
-      {inv.status === 'draft' ? (
+      {inv.status === 'draft' && canEdit ? (
         <>
           {hasEmail ? <Button variant="primary" disabled={pending} onClick={() => run(() => sendInvoiceAction(inv.subAccountId, inv.id, 'email'))}><Mail className="size-4" />Send by email</Button> : null}
           {hasPhone ? <Button variant={hasEmail ? 'secondary' : 'primary'} disabled={pending} onClick={() => run(() => sendInvoiceAction(inv.subAccountId, inv.id, 'sms'))}><MessageSquare className="size-4" />Send by SMS</Button> : null}
           {!hasEmail && !hasPhone ? <Button variant="primary" disabled={pending} onClick={() => run(() => sendInvoiceAction(inv.subAccountId, inv.id))}>Mark as sent</Button> : null}
         </>
       ) : null}
-      {open && inv.status !== 'draft' ? <Button variant="primary" onClick={() => { setErr(null); dlg.current?.showModal(); }}><CreditCard className="size-4" />Record payment</Button> : null}
-      {inv.status === 'overdue' ? <Button disabled={pending} onClick={() => run(() => sendReminderAction(inv.subAccountId, inv.id))}><Bell className="size-4" />Send reminder</Button> : null}
-      {open && inv.status !== 'draft' ? <Button disabled={pending} onClick={() => run(() => sendInvoiceAction(inv.subAccountId, inv.id))}><Mail className="size-4" />Resend</Button> : null}
+      {open && inv.status !== 'draft' && canRecord ? <Button variant="primary" onClick={() => { setErr(null); dlg.current?.showModal(); }}><CreditCard className="size-4" />Record payment</Button> : null}
+      {inv.status === 'overdue' && canEdit ? <Button disabled={pending} onClick={() => run(() => sendReminderAction(inv.subAccountId, inv.id))}><Bell className="size-4" />Send reminder</Button> : null}
+      {open && inv.status !== 'draft' && canEdit ? <Button disabled={pending} onClick={() => run(() => sendInvoiceAction(inv.subAccountId, inv.id))}><Mail className="size-4" />Resend</Button> : null}
       <Button onClick={() => { navigator.clipboard.writeText(link); toast('Payment link copied'); }}><Copy className="size-4" />Copy link</Button>
       <a href={link} target="_blank" rel="noreferrer" className={buttonClass('secondary')}><ExternalLink className="size-4" />Customer view</a>
       <a href={`${link}?print=1`} target="_blank" rel="noreferrer" className={buttonClass('ghost')}><Printer className="size-4" />PDF</a>
-      {!inv.amountPaidCents && open ? <Link href={`/invoices/${inv.id}/edit`} className={buttonClass('ghost')}><Pencil className="size-4" />Edit</Link> : null}
-      {!inv.amountPaidCents && open ? <Button variant="ghost" disabled={pending} onClick={() => { if (confirm(`Cancel ${inv.number}?`)) run(() => cancelInvoiceAction(inv.subAccountId, inv.id)); }}><Ban className="size-4" />Cancel</Button> : null}
+      {!inv.amountPaidCents && open && canEdit ? <Link href={`/invoices/${inv.id}/edit`} className={buttonClass('ghost')}><Pencil className="size-4" />Edit</Link> : null}
+      {!inv.amountPaidCents && open && canEdit ? <Button variant="ghost" disabled={pending} onClick={() => { if (confirm(`Cancel ${inv.number}?`)) run(() => cancelInvoiceAction(inv.subAccountId, inv.id)); }}><Ban className="size-4" />Cancel</Button> : null}
 
       <dialog ref={dlg} className="m-auto w-[min(26rem,calc(100vw-1.5rem))] rounded-3xl border border-border bg-surface p-0 text-text">
         <form action={(fd) => start(async () => {

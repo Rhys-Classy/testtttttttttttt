@@ -10,7 +10,7 @@ const variants: Record<Variant, string> = {
   primary: 'bg-accent text-accent-fg hover:opacity-90',
   secondary: 'bg-surface text-text border border-border hover:bg-surface-2',
   ghost: 'text-text hover:bg-surface-2',
-  danger: 'bg-danger text-white hover:opacity-90',
+  danger: 'bg-danger text-on-solid hover:opacity-90',
   soft: 'bg-accent-soft text-accent hover:opacity-90',
 };
 const sizes: Record<Size, string> = {

@@ -96,7 +96,7 @@ export function CommandPalette({ data }: { data: ShellData }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[70] flex items-start justify-center p-3 pt-[10vh]" role="dialog" aria-modal="true" aria-label="Command centre">
-      <button className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" aria-label="Close" onClick={close} />
+      <button className="absolute inset-0 bg-backdrop backdrop-blur-[2px]" aria-label="Close" onClick={close} />
       <Command shouldFilter={false} loop className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-border bg-surface shadow-2xl"
         onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); if (clarify) setClarify(null); else close(); } }}>
         <div className="flex items-center gap-3 border-b border-border px-4">

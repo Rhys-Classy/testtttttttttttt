@@ -1,3 +1,5 @@
+import type { Permission } from '@/lib/permissions';
+
 /**
  * Feature modules. Each business switches on the modules it needs; navigation,
  * quick-add and dashboards are built from this list, never from business names.
@@ -19,28 +21,30 @@ export type ModuleDef = {
   group: ModuleGroup;
   /** Always on, cannot be disabled. */
   core?: boolean;
+  /** Needed to see the module at all. */
+  permission: Permission;
 };
 
 export const MODULES: ModuleDef[] = [
-  { key: 'tasks', label: 'Tasks', description: 'My Day, to-dos, reminders', href: '/tasks', icon: 'CheckCircle2', group: 'daily', core: true },
-  { key: 'calendar', label: 'Calendar', description: 'Appointments, jobs and events', href: '/calendar', icon: 'CalendarDays', group: 'daily' },
-  { key: 'inbox', label: 'Inbox', description: 'Email, SMS, calls and social messages', href: '/inbox', icon: 'Inbox', group: 'daily' },
-  { key: 'crm', label: 'Contacts', description: 'People and companies', href: '/contacts', icon: 'Users', group: 'customers', core: true },
-  { key: 'leads', label: 'Leads', description: 'New enquiries to follow up', href: '/leads', icon: 'Sparkles', group: 'customers' },
-  { key: 'sales', label: 'Pipeline', description: 'Deals moving through stages', href: '/pipeline', icon: 'KanbanSquare', group: 'sales' },
-  { key: 'quotes', label: 'Quotes', description: 'Estimates customers can accept online', href: '/quotes', icon: 'FileText', group: 'sales' },
-  { key: 'jobs', label: 'Jobs', description: 'Booked work from quote to completion', href: '/jobs', icon: 'Hammer', group: 'work' },
-  { key: 'staff', label: 'Staff', description: 'Team members and support workers', href: '/staff', icon: 'UserCog', group: 'work' },
-  { key: 'orders', label: 'Orders', description: 'Product orders', href: '/orders', icon: 'ShoppingBag', group: 'sales' },
-  { key: 'invoices', label: 'Invoices', description: 'Bill customers and get paid', href: '/invoices', icon: 'Receipt', group: 'money' },
-  { key: 'payments', label: 'Payments', description: 'Money in, refunds, failures', href: '/payments', icon: 'Wallet', group: 'money' },
-  { key: 'products', label: 'Products', description: 'Products and services catalogue', href: '/products', icon: 'Package', group: 'money' },
-  { key: 'campaigns', label: 'Campaigns', description: 'Email and SMS marketing', href: '/campaigns', icon: 'Megaphone', group: 'marketing' },
-  { key: 'automations', label: 'Automations', description: 'Workflows that run on their own', href: '/automations', icon: 'Workflow', group: 'marketing' },
-  { key: 'forms', label: 'Forms', description: 'Enquiry forms with public links', href: '/forms', icon: 'ClipboardList', group: 'marketing' },
-  { key: 'landing_pages', label: 'Landing pages', description: 'Simple web pages', href: '/pages', icon: 'LayoutTemplate', group: 'marketing' },
-  { key: 'documents', label: 'Documents', description: 'Files and photos', href: '/documents', icon: 'FolderOpen', group: 'work' },
-  { key: 'reports', label: 'Reports', description: 'Sales, revenue and marketing numbers', href: '/reports', icon: 'BarChart3', group: 'insights' },
+  { key: 'tasks', label: 'Tasks', description: 'My Day, to-dos, reminders', href: '/tasks', icon: 'CheckCircle2', group: 'daily', core: true, permission: 'tasks.view' },
+  { key: 'calendar', label: 'Calendar', description: 'Appointments, jobs and events', href: '/calendar', icon: 'CalendarDays', group: 'daily', permission: 'calendar.view' },
+  { key: 'inbox', label: 'Inbox', description: 'Email, SMS, calls and social messages', href: '/inbox', icon: 'Inbox', group: 'daily', permission: 'inbox.view' },
+  { key: 'crm', label: 'Contacts', description: 'People and companies', href: '/contacts', icon: 'Users', group: 'customers', core: true, permission: 'contacts.view' },
+  { key: 'leads', label: 'Leads', description: 'New enquiries to follow up', href: '/leads', icon: 'Sparkles', group: 'customers', permission: 'sales.view' },
+  { key: 'sales', label: 'Pipeline', description: 'Deals moving through stages', href: '/pipeline', icon: 'KanbanSquare', group: 'sales', permission: 'sales.view' },
+  { key: 'quotes', label: 'Quotes', description: 'Estimates customers can accept online', href: '/quotes', icon: 'FileText', group: 'sales', permission: 'quotes.view' },
+  { key: 'jobs', label: 'Jobs', description: 'Booked work from quote to completion', href: '/jobs', icon: 'Hammer', group: 'work', permission: 'jobs.view' },
+  { key: 'staff', label: 'Staff', description: 'Team members and support workers', href: '/staff', icon: 'UserCog', group: 'work', permission: 'staff.view' },
+  { key: 'orders', label: 'Orders', description: 'Product orders', href: '/orders', icon: 'ShoppingBag', group: 'sales', permission: 'orders.view' },
+  { key: 'invoices', label: 'Invoices', description: 'Bill customers and get paid', href: '/invoices', icon: 'Receipt', group: 'money', permission: 'invoices.view' },
+  { key: 'payments', label: 'Payments', description: 'Money in, refunds, failures', href: '/payments', icon: 'Wallet', group: 'money', permission: 'payments.view' },
+  { key: 'products', label: 'Products', description: 'Products and services catalogue', href: '/products', icon: 'Package', group: 'money', permission: 'products.view' },
+  { key: 'campaigns', label: 'Campaigns', description: 'Email and SMS marketing', href: '/campaigns', icon: 'Megaphone', group: 'marketing', permission: 'marketing.view' },
+  { key: 'automations', label: 'Automations', description: 'Workflows that run on their own', href: '/automations', icon: 'Workflow', group: 'marketing', permission: 'automations.view' },
+  { key: 'forms', label: 'Forms', description: 'Enquiry forms with public links', href: '/forms', icon: 'ClipboardList', group: 'marketing', permission: 'marketing.view' },
+  { key: 'landing_pages', label: 'Landing pages', description: 'Simple web pages', href: '/pages', icon: 'LayoutTemplate', group: 'marketing', permission: 'marketing.view' },
+  { key: 'documents', label: 'Documents', description: 'Files and photos', href: '/documents', icon: 'FolderOpen', group: 'work', permission: 'documents.view' },
+  { key: 'reports', label: 'Reports', description: 'Sales, revenue and marketing numbers', href: '/reports', icon: 'BarChart3', group: 'insights', permission: 'reports.view' },
 ];
 
 export const GROUP_LABELS: Record<ModuleGroup, string> = {

@@ -58,7 +58,7 @@ export function AssistantPanel({ currentBusiness }: { currentBusiness: string | 
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[65] flex justify-end" role="dialog" aria-modal="true" aria-label="Assistant">
-      <button className="absolute inset-0 bg-black/30" aria-label="Close" onClick={() => setOpen(false)} />
+      <button className="absolute inset-0 bg-backdrop" aria-label="Close" onClick={() => setOpen(false)} />
       <div className="pb-safe relative flex h-full w-full max-w-md flex-col border-l border-border bg-surface shadow-2xl">
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
           <div className="flex size-9 items-center justify-center rounded-xl bg-accent-soft text-accent"><Bot className="size-5" /></div>

@@ -1,6 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import type { Tx } from '@/db/client';
-import { activities, auditLog, events, subAccounts } from '@/db/schema';
+import { activities, events, subAccounts } from '@/db/schema';
 import { getTaxRegime } from '@/lib/tax';
 
 /** Who is doing the work, and in which ONE business. Every write service takes one. */
@@ -21,6 +21,14 @@ export class ValidationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'ValidationError';
+  }
+}
+
+/** The person is signed in but their role doesn't allow this. */
+export class ForbiddenError extends Error {
+  constructor(message = "You don't have permission to do that.") {
+    super(message);
+    this.name = 'ForbiddenError';
   }
 }
 
@@ -87,16 +95,13 @@ export async function logActivity(
   });
 }
 
-export async function audit(tx: Tx, scope: Scope, action: string, entityType: string, entityId: string | null, data: Record<string, unknown> = {}) {
-  await tx.insert(auditLog).values({
-    subAccountId: scope.subAccountId,
-    actorUserId: scope.userId,
-    actor: scope.actor,
-    action,
-    entityType,
-    entityId,
-    data,
-  });
+/**
+ * Explicit audit entry for events a table trigger can't see. Most history
+ * (customers, invoices, payments, quotes, automations, integrations, team)
+ * is recorded automatically by database triggers.
+ */
+export async function audit(tx: Tx, scope: Scope, action: string, entityType: string, entityId: string | null, label: string | null = null, data: Record<string, unknown> = {}) {
+  await tx.execute(sql`select app.audit_write(${scope.subAccountId}::uuid, ${action}, ${entityType}, ${entityId}::uuid, ${label}, ${JSON.stringify(data)}::jsonb)`);
 }
 
 /** Next document number from the business's sequence (INV-1001, Q-1001...). */

@@ -6,7 +6,8 @@ import { formatDate, relativeTime } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import { businessById, readScope, requireContext } from '@/server/context';
 import { contactName } from '@/server/services/crm';
-import { moduleScope, qs, sp1, type SP } from '@/server/page-helpers';
+import { moduleScope, qs, sp1, type SP, pageOf, splitPage } from '@/server/page-helpers';
+import { Pager } from '@/components/ui/pager';
 import { PageHeader } from '@/components/ui/page';
 import { List, ListRow, Tabs } from '@/components/ui/list';
 import { StatusBadge } from '@/components/ui/badge';
@@ -26,18 +27,20 @@ export default async function QuotesPage({ searchParams }: { searchParams: SP })
   const status = sp1(p.status) && sp1(p.status)! in FILTERS ? sp1(p.status)! : 'open';
   const b = sp1(p.b);
   const scope = moduleScope(ctx, 'quotes', b);
-  if (!scope.businesses.length) return <ModuleOff label="Quotes" business={ctx.current?.name} />;
+  if (!scope.businesses.length) return <ModuleOff label="Quotes" business={ctx.current?.name} noAccess={scope.noAccess} />;
   const all = !ctx.current;
-  const { rows, sums } = await readScope(ctx, async (tx) => {
+  const pg = pageOf(p);
+  const { rows: fetched, sums } = await readScope(ctx, async (tx) => {
     const base = sql`${quotes.subAccountId} = any(${pgArray(scope.ids)})`;
     const f = FILTERS[status];
     return {
       rows: await tx.select({ q: quotes, c: contacts }).from(quotes)
         .leftJoin(contacts, and(eq(contacts.id, quotes.contactId), eq(contacts.subAccountId, quotes.subAccountId)))
-        .where(and(base, f ? inArray(quotes.status, f as never[]) : undefined)).orderBy(desc(quotes.createdAt)).limit(300),
+        .where(and(base, f ? inArray(quotes.status, f as never[]) : undefined)).orderBy(desc(quotes.createdAt), desc(quotes.id)).limit(pg.limit).offset(pg.offset),
       sums: await tx.select({ s: quotes.status, n: sql<number>`count(*)`, v: sql<number>`coalesce(sum(${quotes.totalCents}),0)` }).from(quotes).where(base).groupBy(quotes.status),
     };
   });
+  const { rows, hasNext } = splitPage(fetched);
   const cnt = (k: string[]) => sums.filter((x) => k.includes(x.s)).reduce((a, x) => a + Number(x.n), 0);
   const base = { status: status === 'open' ? undefined : status, b };
   const tabs = [
@@ -63,6 +66,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: SP })
           ))}
         </List>
       ) : <EmptyState title="No quotes here" body="Type “quote Sarah $18,500 plus GST” in ⌘K, or use New quote." />}
+      <Pager path="/quotes" params={p} page={pg.page} hasNext={hasNext} shown={rows.length} />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { invoices } from '@/db/schema';
 import { parseMoney } from '@/lib/money';
 import { zonedTimeToUtc } from '@/lib/dates';
 import { inBusiness, requireContext } from '@/server/context';
+import type { Permission } from '@/lib/permissions';
 import { addNote, contactName, createContact, createDeal, createLead, getContact } from '@/server/services/crm';
 import { createInvoice, createQuote, recordManualPayment } from '@/server/services/finance';
 import { createAppointment, createJob, createTask } from '@/server/services/work';
@@ -22,6 +23,11 @@ function localDateTime(date: string, time: string | null, tz: string, defaultHou
   return zonedTimeToUtc(y, m, d, hh, mm || 0, tz);
 }
 
+const QUICK_PERMS: Record<QuickKind, Permission> = {
+  contact: 'contacts.edit', lead: 'sales.edit', deal: 'sales.edit', task: 'tasks.edit', appointment: 'calendar.edit',
+  quote: 'quotes.edit', invoice: 'invoices.edit', payment: 'payments.record', note: 'contacts.edit', job: 'jobs.edit',
+};
+
 export async function quickAddAction(kind: QuickKind, fd: FormData): Promise<ActionResult<{ href?: string }>> {
   const ctx = await requireContext();
   return attempt(async () => {
@@ -32,7 +38,7 @@ export async function quickAddAction(kind: QuickKind, fd: FormData): Promise<Act
     const contactId = optStr(fd, 'contactId');
     const amount = parseMoney(str(fd, 'amount'));
 
-    const result = await inBusiness(ctx, subAccountId, async (tx, s): Promise<{ href?: string }> => {
+    const result = await inBusiness(ctx, subAccountId, QUICK_PERMS[kind], async (tx, s): Promise<{ href?: string }> => {
       switch (kind) {
         case 'contact': {
           const c = await createContact(tx, s, { name: str(fd, 'name'), email: optStr(fd, 'email'), phone: optStr(fd, 'phone'), companyName: optStr(fd, 'company'), status: (optStr(fd, 'status') as 'lead' | 'customer') ?? 'lead', source: 'manual' });
@@ -88,7 +94,7 @@ export async function quickAddAction(kind: QuickKind, fd: FormData): Promise<Act
           return { href: `/jobs/${j.id}` };
         }
       }
-    });
+    }, { visible: [['contacts', contactId]] });
     revalidatePath('/', 'layout');
     return result;
   }, `${kind.charAt(0).toUpperCase() + kind.slice(1)} added${biz(ctx, fd) ? ` to ${biz(ctx, fd)}` : ''}`);

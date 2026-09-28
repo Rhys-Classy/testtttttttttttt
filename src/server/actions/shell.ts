@@ -10,7 +10,8 @@ import { parseCommand, type ParsedCommand } from '@/lib/commands/parse';
 import { tzOffsetMinutes } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import { AU_GST } from '@/lib/tax';
-import { BUSINESS_COOKIE, businessById, inBusiness, readScope, requireContext, type AppContext } from '@/server/context';
+import { BUSINESS_COOKIE, businessById, can, inBusiness, readScope, requireContext, type AppContext } from '@/server/context';
+import type { Permission } from '@/lib/permissions';
 import { contactName, createContact, createLead } from '@/server/services/crm';
 import { createInvoice, createQuote } from '@/server/services/finance';
 import { createAppointment, createTask } from '@/server/services/work';
@@ -69,8 +70,8 @@ async function resolveContact(ctx: AppContext, who: string, pick: Pick, action: 
   if (pick.contactId && pick.subAccountId) return { contactId: pick.contactId, subAccountId: pick.subAccountId };
   if (pick.createContact) {
     const subAccountId = pick.subAccountId ?? ctx.current?.id;
-    if (!subAccountId) return chooseBusiness(ctx, `Which business is ${who} a customer of?`, { createContact: true });
-    const c = await inBusiness(ctx, subAccountId, (tx, s) => createContact(tx, s, { name: who }));
+    if (!subAccountId) return chooseBusiness(ctx, `Which business is ${who} a customer of?`, { createContact: true }, 'contacts.edit');
+    const c = await inBusiness(ctx, subAccountId, 'contacts.edit', (tx, s) => createContact(tx, s, { name: who }));
     return { contactId: c.id, subAccountId };
   }
   const people = await findPeople(ctx, who);
@@ -85,8 +86,10 @@ async function resolveContact(ctx: AppContext, who: string, pick: Pick, action: 
   return { kind: 'clarify', question: people.length ? `Which ${who} do you mean for this ${action}?` : `No one called "${who}" yet. Create them?`, options };
 }
 
-function chooseBusiness(ctx: AppContext, question: string, extra: Pick = {}): CommandOutcome {
-  return { kind: 'clarify', question, options: ctx.businesses.map((b) => ({ label: b.name, color: b.color, pick: { ...extra, subAccountId: b.id } })) };
+function chooseBusiness(ctx: AppContext, question: string, extra: Pick = {}, perm?: Permission): CommandOutcome {
+  const options = ctx.businesses.filter((b) => !perm || can(ctx, perm, b.id));
+  if (!options.length) return { kind: 'error', message: 'Your role doesn’t allow that in any business.' };
+  return { kind: 'clarify', question, options: options.map((b) => ({ label: b.name, color: b.color, pick: { ...extra, subAccountId: b.id } })) };
 }
 
 /**
@@ -118,11 +121,11 @@ export async function runCommandAction(input: string | ParsedCommand, pick: Pick
         const pricesIncludeTax = cmd.gst === 'inc' ? true : cmd.gst === 'plus' ? false : undefined;
         const line = { description: cmd.description ?? (cmd.intent === 'create_invoice' ? 'Services' : 'Quoted works'), quantity: 1, unitPriceCents: cmd.amountCents, taxCode: b.taxRegime === 'AU_GST' ? AU_GST.defaultCode : undefined };
         if (cmd.intent === 'create_invoice') {
-          const inv = await inBusiness(ctx, r.subAccountId, (tx, s) => createInvoice(tx, s, { contactId: r.contactId, lines: [line], pricesIncludeTax }));
+          const inv = await inBusiness(ctx, r.subAccountId, 'invoices.edit', (tx, s) => createInvoice(tx, s, { contactId: r.contactId, lines: [line], pricesIncludeTax }), { visible: [['contacts', r.contactId]] });
           revalidatePath('/invoices');
           return { kind: 'done', message: `Draft invoice ${inv.number} for ${formatMoney(inv.totalCents)} created in ${b.name}. Review and send.`, href: `/invoices/${inv.id}` };
         }
-        const q = await inBusiness(ctx, r.subAccountId, (tx, s) => createQuote(tx, s, { contactId: r.contactId, lines: [line], pricesIncludeTax }));
+        const q = await inBusiness(ctx, r.subAccountId, 'quotes.edit', (tx, s) => createQuote(tx, s, { contactId: r.contactId, lines: [line], pricesIncludeTax }), { visible: [['contacts', r.contactId]] });
         revalidatePath('/quotes');
         return { kind: 'done', message: `Draft quote ${q.number} for ${formatMoney(q.totalCents)} created in ${b.name}.`, href: `/quotes/${q.id}` };
       }
@@ -133,10 +136,10 @@ export async function runCommandAction(input: string | ParsedCommand, pick: Pick
           const people = await findPeople(ctx, cmd.who);
           if (people.length === 1) { contactId = people[0].id; subAccountId = people[0].subAccountId; }
         } else if (pick.contactId) contactId = pick.contactId;
-        if (!subAccountId) return chooseBusiness(ctx, 'Which business is this task for?');
+        if (!subAccountId) return chooseBusiness(ctx, 'Which business is this task for?', {}, 'tasks.edit');
         const due = cmd.due ? new Date(cmd.due) : undefined;
         const b = businessById(ctx, subAccountId)!;
-        await inBusiness(ctx, subAccountId, (tx, s) => createTask(tx, s, { title: cmd.title, dueAt: due, allDay: cmd.allDay, contactId, source: 'manual' }));
+        await inBusiness(ctx, subAccountId, 'tasks.edit', (tx, s) => createTask(tx, s, { title: cmd.title, dueAt: due, allDay: cmd.allDay, contactId, source: 'manual' }), { visible: [['contacts', contactId]] });
         revalidatePath('/', 'layout');
         return { kind: 'done', message: `Task added to ${b.name}: ${cmd.title}`, href: '/tasks' };
       }
@@ -149,22 +152,22 @@ export async function runCommandAction(input: string | ParsedCommand, pick: Pick
           contactId = r.contactId;
           subAccountId = r.subAccountId;
         }
-        if (!subAccountId) return chooseBusiness(ctx, 'Which business is this appointment for?');
-        await inBusiness(ctx, subAccountId, (tx, s) => createAppointment(tx, s, { title: cmd.title, startsAt: new Date(cmd.start), durationMinutes: cmd.durationMinutes, contactId }));
+        if (!subAccountId) return chooseBusiness(ctx, 'Which business is this appointment for?', {}, 'calendar.edit');
+        await inBusiness(ctx, subAccountId, 'calendar.edit', (tx, s) => createAppointment(tx, s, { title: cmd.title, startsAt: new Date(cmd.start), durationMinutes: cmd.durationMinutes, contactId }), { visible: [['contacts', contactId]] });
         revalidatePath('/calendar');
         return { kind: 'done', message: `Booked: ${cmd.title}`, href: `/calendar` };
       }
       case 'create_contact':
       case 'create_lead': {
         const subAccountId = pick.subAccountId ?? ctx.current?.id;
-        if (!subAccountId) return chooseBusiness(ctx, `Which business is ${cmd.name || 'this person'} for?`);
+        if (!subAccountId) return chooseBusiness(ctx, `Which business is ${cmd.name || 'this person'} for?`, {}, cmd.intent === 'create_lead' ? 'sales.edit' : 'contacts.edit');
         const b = businessById(ctx, subAccountId)!;
         if (cmd.intent === 'create_lead') {
-          const { contact } = await inBusiness(ctx, subAccountId, (tx, s) => createLead(tx, s, { name: cmd.name, email: cmd.email, phone: cmd.phone, source: (cmd.source ?? 'manual') as never }));
+          const { contact } = await inBusiness(ctx, subAccountId, 'sales.edit', (tx, s) => createLead(tx, s, { name: cmd.name, email: cmd.email, phone: cmd.phone, source: (cmd.source ?? 'manual') as never }));
           revalidatePath('/', 'layout');
           return { kind: 'done', message: `Lead added to ${b.name}: ${contactName(contact)}`, href: `/contacts/${contact.id}` };
         }
-        const c = await inBusiness(ctx, subAccountId, (tx, s) => createContact(tx, s, { name: cmd.name, email: cmd.email, phone: cmd.phone, source: (cmd.source ?? 'manual') as never }));
+        const c = await inBusiness(ctx, subAccountId, 'contacts.edit', (tx, s) => createContact(tx, s, { name: cmd.name, email: cmd.email, phone: cmd.phone, source: (cmd.source ?? 'manual') as never }));
         return { kind: 'done', message: `Contact added to ${b.name}: ${contactName(c)}`, href: `/contacts/${c.id}` };
       }
     }

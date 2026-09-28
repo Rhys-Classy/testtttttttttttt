@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { appointments, contacts, jobs, tasks } from '@/db/schema';
 import { pgArray } from '@/db/sql';
 import { addDaysKey, dayRange, formatDate, formatTime, monthRange, toDateKey, todayKey, weekRange } from '@/lib/dates';
-import { businessById, readScope, requireContext } from '@/server/context';
+import { can, businessById, readScope, requireContext } from '@/server/context';
 import { contactName } from '@/server/services/crm';
 import { qs, sp1, type SP } from '@/server/page-helpers';
 import { PageHeader } from '@/components/ui/page';
@@ -13,10 +13,13 @@ import { BusinessFilter } from '@/components/business-filter';
 import { cn } from '@/lib/cn';
 import { EventChip, type CalEvent } from './event-chip';
 
+import { NoAccess } from '@/components/no-access';
+
 export const metadata = { title: 'Calendar' };
 
 export default async function CalendarPage({ searchParams }: { searchParams: SP }) {
   const ctx = await requireContext();
+  if (!can(ctx, 'calendar.view')) return <NoAccess what="the calendar" />;
   const p = await searchParams;
   const tz = ctx.tz;
   const today = todayKey(tz);

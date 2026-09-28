@@ -6,8 +6,9 @@ import { friendlyError } from '@/server/actions/_util';
 import { isUuid } from '@/db/context';
 
 const ENTITY_TYPES = ['business', 'contact', 'company', 'deal', 'job', 'invoice', 'quote'] as const;
+const ENTITY_TABLES = { business: null, contact: 'contacts', company: 'companies', deal: 'deals', job: 'jobs', invoice: 'invoices', quote: 'quotes' } as const;
 
-/** Upload. The business is re-checked by RLS when the document row is inserted. */
+/** Upload. Needs documents.edit in the business, and the record it's attached to must be visible to the user. */
 export async function POST(req: Request) {
   const ctx = await getAppContext();
   if (!ctx) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
@@ -22,10 +23,11 @@ export async function POST(req: Request) {
   if (file.size > MAX_UPLOAD_BYTES) return NextResponse.json({ error: 'Files must be under 25 MB.' }, { status: 400 });
   if (!ALLOWED_MIME.includes(file.type)) return NextResponse.json({ error: 'PDF, images and Office documents only.' }, { status: 400 });
   try {
-    const doc = await inBusiness(ctx, subAccountId, async (tx, s) => {
+    const entityTable = ENTITY_TABLES[entityType];
+    const doc = await inBusiness(ctx, subAccountId, 'documents.edit', async (tx, s) => {
       const key = await storage().put(s.subAccountId, file.name, Buffer.from(await file.arrayBuffer()));
       return createDocumentRecord(tx, s, { entityType, entityId, contactId, filename: file.name.slice(0, 200), mimeType: file.type, sizeBytes: file.size, storageKey: key });
-    });
+    }, { visible: [['contacts', contactId], ...(entityTable ? [[entityTable, entityId] as [typeof entityTable, string | null]] : [])] });
     return NextResponse.json({ ok: true, id: doc.id });
   } catch (e) {
     return NextResponse.json({ error: friendlyError(e) }, { status: 400 });

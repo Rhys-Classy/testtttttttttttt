@@ -51,7 +51,7 @@ export function TaskRow({ task, showBusiness }: { task: TaskRowData; showBusines
     <div className={cn('group relative flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-surface-2', done && 'opacity-60')}>
       <button onClick={toggle} aria-label={done ? 'Mark not done' : 'Mark done'}
         className={cn('flex size-8 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
-          done ? 'border-ok bg-ok text-white' : task.priority === 'urgent' || task.priority === 'high' ? 'border-danger/60 hover:bg-danger-soft' : 'border-border hover:border-accent hover:bg-accent-soft')}>
+          done ? 'border-ok bg-ok text-on-solid' : task.priority === 'urgent' || task.priority === 'high' ? 'border-danger/60 hover:bg-danger-soft' : 'border-border hover:border-accent hover:bg-accent-soft')}>
         {done ? <Check className="size-4" /> : <Circle className="size-0" />}
       </button>
       <div className="min-w-0 flex-1">

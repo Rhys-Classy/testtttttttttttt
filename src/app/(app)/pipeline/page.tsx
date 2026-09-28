@@ -17,7 +17,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: SP 
   const ctx = await requireContext();
   const p = await searchParams;
   const scope = moduleScope(ctx, 'sales');
-  if (!scope.businesses.length) return <ModuleOff label="Pipeline" business={ctx.current?.name} />;
+  if (!scope.businesses.length) return <ModuleOff label="Pipeline" business={ctx.current?.name} noAccess={scope.noAccess} />;
   // Pipelines belong to one business; in All view pick which one to look at.
   const bizId = ctx.current?.id ?? (sp1(p.b) && scope.businesses.some((b) => b.id === sp1(p.b)) ? sp1(p.b)! : scope.businesses[0].id);
   const view = sp1(p.view) === 'list' ? 'list' : 'board';
