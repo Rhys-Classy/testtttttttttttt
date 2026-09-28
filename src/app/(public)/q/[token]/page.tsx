@@ -75,7 +75,7 @@ export default async function PublicQuotePage({ params, searchParams }: { params
         {expired && d.q.status !== 'accepted' ? <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800 print:hidden">This quote expired on {formatDate(d.q.expiryDate)}. Contact us for an updated price.</div> : null}
         <DocumentView business={d.business} customer={d.customer} lines={d.lines} doc={{ ...d.q, kind: 'quote' }} />
         {open ? (
-          <div className="grid gap-4 print:hidden sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 print:hidden sm:grid-cols-3">
             <form action={accept.bind(null, token)} className="space-y-3 rounded-2xl bg-white p-5 shadow-sm sm:col-span-2">
               <p className="font-semibold">Accept this quote ({formatMoney(d.q.totalCents, d.q.currency)})</p>
               <input name="name" required placeholder="Your full name" className="h-12 w-full rounded-xl border border-slate-300 px-3" />

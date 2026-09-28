@@ -20,7 +20,7 @@ export default async function FieldsPage() {
     <div className="space-y-5">
       <PageHeader title="Custom fields" subtitle={`Fields only ${ctx.current.name} needs. Add as many as you like — no developer needed.`} />
       <Card><CardHeader title="Add a field" /><CardBody>
-        <ActionForm action={defineFieldAction} resetOnSuccess className="grid gap-3 sm:grid-cols-[1fr_9rem_9rem_1fr_auto] sm:items-end">
+        <ActionForm action={defineFieldAction} resetOnSuccess className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_9rem_9rem_1fr_auto] sm:items-end">
           <input type="hidden" name="subAccountId" value={ctx.current.id} />
           <Field label="Label"><Input name="label" required placeholder="Door profile" /></Field>
           <Field label="On"><Select name="entityType" defaultValue="contact">{groups.map((g) => <option key={g} value={g}>{g}</option>)}</Select></Field>

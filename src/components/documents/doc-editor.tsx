@@ -72,7 +72,7 @@ export function DocEditor({ kind, action, initial, business, businesses, product
     <form action={submit} className="space-y-5">
       {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
       <FormError error={error} />
-      <div className="grid gap-4 rounded-2xl border border-border bg-surface p-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 rounded-2xl border border-border bg-surface p-4 sm:grid-cols-2">
         <Field label="Customer">
           <ContactPicker required initial={initial.contact ?? null} onPick={(h) => h && setSubAccountId(h.subAccountId)} />
         </Field>
@@ -145,7 +145,7 @@ export function DocEditor({ kind, action, initial, business, businesses, product
         </div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Notes to customer"><Textarea name="notes" defaultValue={initial.notes} rows={3} /></Field>
         <Field label="Terms"><Textarea name="terms" defaultValue={initial.terms} rows={3} /></Field>
       </div>

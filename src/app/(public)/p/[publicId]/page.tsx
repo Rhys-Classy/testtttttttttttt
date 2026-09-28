@@ -47,7 +47,7 @@ export default async function PublicLandingPage({ params }: { params: Promise<{ 
           case 'image': return safeImg(s.url) ? <img key={s.id} src={safeImg(s.url)} alt={s.alt ?? ''} className="mx-auto my-6 max-h-[32rem] w-full max-w-4xl rounded-2xl object-cover px-6" /> : null;
           case 'button': return <div key={s.id} className="py-6 text-center"><a href={safeHref(s.href)} className="inline-block rounded-xl px-6 py-3 font-semibold text-white" style={{ backgroundColor: accent }}>{s.label}</a></div>;
           case 'testimonials': return (
-            <section key={s.id} className="mx-auto grid max-w-5xl gap-4 px-6 py-12 sm:grid-cols-2 lg:grid-cols-3">
+            <section key={s.id} className="mx-auto grid grid-cols-1 max-w-5xl gap-4 px-6 py-12 sm:grid-cols-2 lg:grid-cols-3">
               {s.items.map((t, i) => <blockquote key={i} className="rounded-2xl bg-slate-50 p-6"><p className="text-lg">“{t.quote}”</p><footer className="mt-3 text-sm font-medium text-slate-500">— {t.name}</footer></blockquote>)}
             </section>
           );

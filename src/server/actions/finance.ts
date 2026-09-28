@@ -3,15 +3,17 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { eq, and } from 'drizzle-orm';
-import { contacts, invoices } from '@/db/schema';
+import { contacts, invoices, payments } from '@/db/schema';
 import { parseMoney } from '@/lib/money';
 import { inBusiness, requireContext } from '@/server/context';
 import {
   acceptQuote, balanceDue, cancelInvoice, createInvoice, createInvoiceFromQuote, createProduct, createQuote, getInvoice,
-  invoiceUrl, recordManualPayment, rejectQuote, sendInvoice, sendQuote, updateInvoiceLines, updateProduct, updateQuoteLines,
+  invoiceUrl, recordManualPayment, refundManualPayment, rejectQuote, sendInvoice, sendQuote, updateInvoiceLines, updateProduct, updateQuoteLines,
   type LineItemInput,
 } from '@/server/services/finance';
 import { queueMessage } from '@/server/services/comms';
+import { getStripeCreds } from '@/server/services/stripe';
+import { refundPayment } from '@/lib/integrations/stripe';
 import { formatMoney } from '@/lib/money';
 import { ValidationError } from '@/server/services/_common';
 import { attempt, num, optStr, str } from './_util';
@@ -94,6 +96,24 @@ export async function recordPaymentAction(fd: FormData) {
     return recordManualPayment(tx, s, { invoiceId, amountCents: amount, method: str(fd, 'method') || 'bank_transfer', reference: optStr(fd, 'reference'), paidAt: optStr(fd, 'paidAt') ? new Date(str(fd, 'paidAt')) : undefined });
   }).then(() => undefined), 'Payment recorded');
   revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath('/', 'layout');
+  return res;
+}
+
+/** Refund: Stripe payments are refunded through Stripe (the webhook records it); manual ones are marked refunded. */
+export async function refundPaymentAction(subAccountId: string, paymentId: string) {
+  const ctx = await requireContext();
+  const res = await attempt(async () => {
+    const prep = await inBusiness(ctx, subAccountId, async (tx, s) => {
+      const [p] = await tx.select().from(payments).where(and(eq(payments.subAccountId, s.subAccountId), eq(payments.id, paymentId)));
+      if (!p) throw new ValidationError('Payment not found.');
+      if (p.provider === 'manual') { await refundManualPayment(tx, s, p.id); return null; }
+      const stripe = await getStripeCreds(tx, s);
+      if (!stripe || !p.providerPaymentId) throw new ValidationError('Stripe is not connected for this business.');
+      return { creds: stripe.creds, pi: p.providerPaymentId, amount: p.amountCents - p.refundedCents };
+    });
+    if (prep) await refundPayment(prep.creds, prep.pi, prep.amount);
+  }, 'Refund issued');
   revalidatePath('/', 'layout');
   return res;
 }

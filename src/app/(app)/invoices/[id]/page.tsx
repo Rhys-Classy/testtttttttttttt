@@ -12,6 +12,7 @@ import { StatusBadge } from '@/components/ui/badge';
 import { BusinessBadge } from '@/components/business-badge';
 import { DocumentView } from '@/components/documents/document-view';
 import { InvoiceActions } from './actions';
+import { RefundButton } from './refund-button';
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -40,7 +41,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       </div>
       {warnings.length && inv.status === 'draft' ? <div className="rounded-2xl bg-warn-soft px-4 py-3 text-sm text-warn">{warnings.map((w) => <p key={w}>• {w}</p>)}</div> : null}
       <InvoiceActions inv={{ id: inv.id, subAccountId: inv.subAccountId, status: inv.status, number: inv.number, amountPaidCents: inv.amountPaidCents }} link={invoiceUrl(inv.publicToken)} hasEmail={!!d.contact?.email} hasPhone={!!d.contact?.phone} balance={formatMoney(balance)} />
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <DocumentView business={d.business} customer={d.customer} lines={d.lines} doc={{ ...inv, kind: 'invoice' }} />
         </div>
@@ -51,7 +52,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               {d.payments.length ? d.payments.map((p) => (
                 <div key={p.id} className="flex items-center justify-between py-1.5 text-sm">
                   <div><p className="font-medium">{formatMoney(p.amountCents, p.currency)}</p><p className="text-xs text-muted">{p.paidAt ? formatDateTime(p.paidAt, ctx.tz) : '—'} · {p.method.replace('_', ' ')}{p.cardLast4 ? ` ····${p.cardLast4}` : ''}</p></div>
-                  <StatusBadge status={p.status} />
+                  <div className="flex items-center gap-2"><StatusBadge status={p.status} />{p.status === 'succeeded' ? <RefundButton subAccountId={p.subAccountId} paymentId={p.id} label={formatMoney(p.amountCents - p.refundedCents, p.currency)} /> : null}</div>
                 </div>
               )) : <p className="text-sm text-muted">No payments yet.</p>}
             </CardBody>

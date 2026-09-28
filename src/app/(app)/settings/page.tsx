@@ -21,7 +21,7 @@ export default async function SettingsPage() {
   return (
     <div>
       <PageHeader title="Settings" subtitle={ctx.current ? `Editing ${ctx.current.name}` : 'Some settings belong to one business — open it first.'} />
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {CARDS.map((c) => (
           <Link key={c.href} href={c.href} className="flex gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-accent">
             <c.icon className="mt-0.5 size-5 shrink-0 text-accent" />

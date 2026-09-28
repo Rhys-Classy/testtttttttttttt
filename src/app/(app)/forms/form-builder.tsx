@@ -58,7 +58,7 @@ export function FormBuilder({ initial, businesses, pipelines, customFields, appU
   const pls = pipelines[subAccountId] ?? [];
   const cfs = customFields[subAccountId] ?? [];
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_20rem]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_20rem]">
       <div className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Form name" className="min-w-56 flex-1"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>

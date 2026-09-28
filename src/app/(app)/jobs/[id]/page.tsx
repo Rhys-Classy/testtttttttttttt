@@ -54,7 +54,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
         </div>
       </div>
       <JobStatusStepper subAccountId={j.subAccountId} id={j.id} status={j.status} />
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
           <Card><CardHeader title="Notes" /><CardBody><JobNotes subAccountId={j.subAccountId} id={j.id} notes={j.notes ?? ''} /></CardBody></Card>
           <Card>

@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bos_admin
+          POSTGRES_PASSWORD: bos_admin
+          POSTGRES_DB: bos_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bos_admin" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://bos_app:bos_app@localhost:5432/bos_test
+      TEST_DATABASE_ADMIN_URL: postgres://bos_admin:bos_admin@localhost:5432/bos_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Create runtime role
+        run: PGPASSWORD=bos_admin psql -h localhost -U bos_admin -d bos_test -c "create role bos_app login password 'bos_app' nosuperuser nobypassrls"
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+        env:
+          DATABASE_URL: postgres://bos_app:bos_app@localhost:5432/bos_test
+          ENCRYPTION_KEY: ci-only-encryption-key-ci-only-encryption

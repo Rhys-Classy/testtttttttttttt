@@ -62,7 +62,7 @@ export function AttentionList({ items, businesses, showBusiness, limit = 7 }: { 
                 <I className="size-5" />
               </span>
               <Link href={item.href} className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{item.title}</p>
+                <p className="line-clamp-2 text-sm font-medium">{item.title}</p>
                 <p className="flex items-center gap-2 truncate text-xs text-muted">
                   {showBusiness ? <BusinessBadge business={biz} /> : null}
                   <span className="truncate">{item.subtitle}</span>

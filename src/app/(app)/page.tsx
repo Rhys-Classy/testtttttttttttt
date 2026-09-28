@@ -58,7 +58,7 @@ export default async function HomePage() {
 
       <QuickActions modules={modules} />
 
-      <div className="grid gap-6 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         <div className="space-y-6 lg:col-span-3">
           <Card>
             <CardHeader title={<span className="flex items-center gap-2"><span className="size-2 rounded-full bg-danger" />Now</span>} subtitle="What needs your attention, most urgent first" />
@@ -144,7 +144,7 @@ export default async function HomePage() {
       {all ? (
         <section>
           <h2 className="mb-3 text-sm font-semibold">Your businesses</h2>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {data.cards.map((card) => {
               const b = businessById(ctx, card.subAccountId)!;
               return (

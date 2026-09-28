@@ -7,6 +7,7 @@ import { createLead } from '@/server/services/crm';
 import { emit } from '@/server/services/_common';
 import { notify } from '@/server/services/notifications';
 import { friendlyError } from '@/server/actions/_util';
+import { rateLimited } from '@/lib/rate-limit';
 
 /**
  * Generic website form webhook (WordPress, Webflow, GoHighLevel, Zapier...).
@@ -19,6 +20,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ integra
   const subAccountId = await withAnonymous(async (tx) =>
     (await tx.execute<{ id: string | null }>(sql`select app.resolve_integration(${integrationId}::uuid) as id`)).rows[0]?.id ?? null);
   if (!subAccountId) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (rateLimited(`webhook|${integrationId}|${req.headers.get('x-forwarded-for') ?? ''}`, 60, 60_000)) return NextResponse.json({ error: 'Slow down' }, { status: 429 });
   const token = new URL(req.url).searchParams.get('token') ?? req.headers.get('x-webhook-token') ?? '';
   const ct = req.headers.get('content-type') ?? '';
   const body: Record<string, unknown> = ct.includes('json') ? await req.json().catch(() => ({})) : Object.fromEntries((await req.formData()).entries());

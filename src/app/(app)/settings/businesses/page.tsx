@@ -27,7 +27,7 @@ export default async function BusinessesPage() {
       </CardBody></Card>
       {ctx.isAccountAdmin ? (
         <Card><CardHeader title="Add a business" /><CardBody>
-          <ActionForm action={addBusinessAction} resetOnSuccess className="grid gap-3 sm:grid-cols-[1fr_14rem_5rem_auto] sm:items-end">
+          <ActionForm action={addBusinessAction} resetOnSuccess className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_14rem_5rem_auto] sm:items-end">
             <Field label="Business name"><Input name="name" required placeholder="New business" /></Field>
             <Field label="Starting setup"><Select name="preset" defaultValue="trades">{Object.entries(MODULE_PRESETS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</Select></Field>
             <Field label="Colour"><Input type="color" name="color" defaultValue="#15803d" className="p-1" /></Field>

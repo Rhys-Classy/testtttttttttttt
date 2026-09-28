@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import Stripe from 'stripe';
 import { closeDb } from '@/db/client';
 import { withContext } from '@/db/context';
 import { contacts, deals, events, invoices, jobs, leads, messages, payments, tasks, webhookEvents, workflowRuns } from '@/db/schema';
 import { createContact, createDeal, getStages } from '@/server/services/crm';
 import {
-  acceptQuote, createInvoice, createQuote, getInvoice, recordManualPayment, recordProviderPayment, sendInvoice, sweepOverdueInvoices,
+  acceptQuote, createInvoice, createQuote, getInvoice, recordManualPayment, recordProviderPayment, refundManualPayment, sendInvoice, sweepOverdueInvoices,
 } from '@/server/services/finance';
 import { completeTask, createTask } from '@/server/services/work';
 import { recordInbound } from '@/server/services/comms';
@@ -72,6 +72,14 @@ describe('quote -> job -> invoice -> payment', () => {
     });
     expect(inv.status).toBe('paid');
     expect(inv.amountPaidCents).toBe(1100_00);
+    const receipts = await asSystem(f.bizA, (tx) => tx.select().from(messages).where(and(eq(messages.contactId, inv.contactId!), sql`${messages.subject} like 'Receipt:%'`)));
+    expect(receipts).toHaveLength(2);
+    // Reverse the second (manual) payment: invoice drops back to partially paid.
+    const [second] = await asSystem(f.bizA, (tx) => tx.select().from(payments).where(and(eq(payments.invoiceId, inv.id), eq(payments.amountCents, 600_00))));
+    await asUser(f.ownerId, f.bizA, (tx, s) => refundManualPayment(tx, s, second.id));
+    const after = await asSystem(f.bizA, (tx, s) => getInvoice(tx, s, inv.id));
+    expect(after.amountPaidCents).toBe(500_00);
+    expect(after.status).toBe('partially_paid');
   });
 
   it('provider payments are idempotent', async () => {

@@ -110,7 +110,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: SP 
           </div>
         </div>
       ) : (
-        <div className={cn('grid gap-3', view === 'week' ? 'md:grid-cols-7' : '')}>
+        <div className={cn('grid grid-cols-1 gap-3', view === 'week' ? 'md:grid-cols-7' : '')}>
           {dayKeys.map((k) => {
             const items = byDay.get(k) ?? [];
             return (

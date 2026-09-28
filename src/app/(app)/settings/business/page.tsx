@@ -22,7 +22,7 @@ export default async function BusinessSettingsPage() {
       <PageHeader title="Business details" subtitle={b.name} />
       <ActionForm action={saveBusinessDetailsAction} className="space-y-5">
         <input type="hidden" name="subAccountId" value={b.id} />
-        <Card><CardHeader title="Identity" /><CardBody className="grid gap-3 sm:grid-cols-2">
+        <Card><CardHeader title="Identity" /><CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Business name"><Input name="name" defaultValue={b.name} required /></Field>
           <div className="grid grid-cols-[1fr_5rem] gap-2"><Field label="Short name" hint="Shown on badges"><Input name="shortName" defaultValue={b.shortName ?? ''} maxLength={6} /></Field><Field label="Colour"><Input type="color" name="color" defaultValue={b.color} className="p-1" /></Field></div>
           <Field label="Trading name"><Input name="tradingName" defaultValue={b.tradingName ?? ''} /></Field>
@@ -36,7 +36,7 @@ export default async function BusinessSettingsPage() {
           <div className="grid grid-cols-3 gap-2 sm:col-span-2"><Field label="Suburb"><Input name="suburb" defaultValue={a.suburb ?? ''} /></Field><Field label="State"><Input name="state" defaultValue={a.state ?? 'VIC'} /></Field><Field label="Postcode"><Input name="postcode" defaultValue={a.postcode ?? ''} /></Field></div>
         </CardBody></Card>
 
-        <Card><CardHeader title="Tax & money" /><CardBody className="grid gap-3 sm:grid-cols-2">
+        <Card><CardHeader title="Tax & money" /><CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Tax"><Select name="taxRegime" defaultValue={b.taxRegime}>{listTaxRegimes().map((r) => <option key={r.id} value={r.id}>{r.id === 'AU_GST' ? 'Australia — GST 10%' : r.id === 'NZ_GST' ? 'New Zealand — GST 15%' : 'No tax'}</option>)}</Select></Field>
           <Field label="Currency"><Select name="currency" defaultValue={b.currency}><option>AUD</option><option>NZD</option><option>USD</option></Select></Field>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="taxRegistered" defaultChecked={b.taxRegistered} />Registered for GST (issue Tax Invoices)</label>
@@ -46,7 +46,7 @@ export default async function BusinessSettingsPage() {
           <Field label="Bank details (shown on invoices)" className="sm:col-span-2"><Textarea name="bankDetails" rows={3} defaultValue={b.bankDetails ?? ''} placeholder={'Account name\nBSB 000-000\nAccount 12345678'} /></Field>
         </CardBody></Card>
 
-        <Card><CardHeader title="Quotes & invoices" /><CardBody className="grid gap-3 sm:grid-cols-3">
+        <Card><CardHeader title="Quotes & invoices" /><CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label="Invoice prefix"><Input name="invoicePrefix" defaultValue={b.invoicePrefix} /></Field>
           <Field label="Quote prefix"><Input name="quotePrefix" defaultValue={b.quotePrefix} /></Field>
           <Field label="Job prefix"><Input name="jobPrefix" defaultValue={b.jobPrefix} /></Field>
@@ -57,7 +57,7 @@ export default async function BusinessSettingsPage() {
           <Field label="Default quote terms" className="sm:col-span-3"><Textarea name="quoteTerms" rows={2} defaultValue={b.quoteTerms ?? ''} /></Field>
         </CardBody></Card>
 
-        <Card><CardHeader title="Words this business uses" subtitle="e.g. a support provider calls contacts “Clients”" /><CardBody className="grid gap-3 sm:grid-cols-4">
+        <Card><CardHeader title="Words this business uses" subtitle="e.g. a support provider calls contacts “Clients”" /><CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-4">
           <Field label="Contact"><Input name="termContact" defaultValue={b.terminology?.contact ?? ''} placeholder="Contact" /></Field>
           <Field label="Contacts"><Input name="termContacts" defaultValue={b.terminology?.contacts ?? ''} placeholder="Contacts" /></Field>
           <Field label="Job"><Input name="termJob" defaultValue={b.terminology?.job ?? ''} placeholder="Job" /></Field>

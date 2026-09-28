@@ -8,6 +8,7 @@ import { submitForm } from '@/server/services/marketing';
 import { createDocumentRecord } from '@/server/services/work';
 import { friendlyError } from '@/server/actions/_util';
 import { ALLOWED_MIME, MAX_UPLOAD_BYTES, storage } from '@/lib/storage';
+import { rateLimited } from '@/lib/rate-limit';
 
 export const metadata = { robots: { index: false } };
 
@@ -17,6 +18,8 @@ async function submit(publicId: string, fd: FormData) {
   if (!subAccountId) notFound();
   if (String(fd.get('company_website_hp') ?? '')) redirect(`/f/${publicId}?sent=1`); // honeypot
   const h = await headers();
+  const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  if (rateLimited(`form|${publicId}|${ip}`, 10, 10 * 60_000)) redirect(`/f/${publicId}?error=${encodeURIComponent('Too many submissions. Please try again later.')}`);
   let target = `/f/${publicId}?sent=1`;
   try {
     await withPublic(subAccountId, async (tx) => {

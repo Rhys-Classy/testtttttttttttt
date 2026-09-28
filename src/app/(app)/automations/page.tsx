@@ -47,7 +47,7 @@ export default async function AutomationsPage({ searchParams }: { searchParams: 
       ) : <EmptyState title="No automations yet" body="Start from a template below — they cover the jobs most businesses repeat every day." />}
       <Card>
         <CardHeader title="Start from a template" subtitle="One click, then tweak the wording" />
-        <CardBody className="grid gap-3 sm:grid-cols-2">
+        <CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {WORKFLOW_TEMPLATES.map((t) => (
             <Link key={t.key} href={`/automations/new?template=${t.key}`} className="rounded-2xl border border-border p-4 hover:border-accent hover:bg-accent-soft">
               <p className="font-medium">{t.name}</p>

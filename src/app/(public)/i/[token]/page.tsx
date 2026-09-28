@@ -46,6 +46,7 @@ export default async function PublicInvoicePage({ params, searchParams }: { para
     <div className="min-h-dvh bg-slate-100 px-3 py-6 text-slate-900 print:bg-white print:p-0 sm:py-10">
       {sp.print ? <PrintOnLoad /> : null}
       <div className="mx-auto max-w-3xl space-y-4">
+        {sp.accepted ? <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 print:hidden">Quote accepted — thank you! {payable ? 'Your deposit invoice is below.' : ''}</div> : null}
         {sp.paid ? <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 print:hidden">Thanks! Your payment is being confirmed — you&apos;ll get a receipt by email.</div> : null}
         {sp.error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 print:hidden">{sp.error}</div> : null}
         {d.inv.status === 'cancelled' ? <div className="rounded-2xl bg-slate-200 px-4 py-3 text-sm print:hidden">This invoice has been cancelled.</div> : null}
@@ -58,7 +59,8 @@ export default async function PublicInvoicePage({ params, searchParams }: { para
             <form action={payNow.bind(null, token)}>
               <button className="h-12 rounded-xl px-6 text-base font-semibold text-white" style={{ backgroundColor: d.business.color }}>Pay now</button>
             </form>
-          ) : d.inv.status === 'paid' ? <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800">Paid</span> : null}
+          ) : d.inv.status === 'paid' ? <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800">Paid</span>
+            : payable && d.business.bankDetails ? <p className="whitespace-pre-line text-right text-sm text-slate-600">{d.business.bankDetails}{'\n'}Ref: {d.inv.number}</p> : null}
         </div>
         <DocumentView business={d.business} customer={d.customer} lines={d.lines} doc={{ ...d.inv, kind: 'invoice' }} />
         <p className="text-center text-xs text-slate-400 print:hidden">Questions? Reply to the email or call {d.business.phone ?? d.business.name}.</p>

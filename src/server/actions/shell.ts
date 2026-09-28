@@ -79,8 +79,9 @@ async function resolveContact(ctx: AppContext, who: string, pick: Pick, action: 
     const b = businessById(ctx, p.subAccountId);
     return { label: contactName(p), sublabel: [b?.name, p.email ?? p.phone].filter(Boolean).join(' · '), color: b?.color, pick: { contactId: p.id, subAccountId: p.subAccountId } };
   });
-  const targets = ctx.current ? [ctx.current] : ctx.businesses;
-  for (const b of targets) options.push({ label: `New contact "${who}"`, sublabel: `in ${b.name}`, color: b.color, pick: { createContact: true, subAccountId: b.id } });
+  // Keep the list short: with matches, offer one "someone new" option (asks for the business next).
+  if (people.length && !ctx.current) options.push({ label: `Someone new called "${who}"`, sublabel: 'Create a new contact', pick: { createContact: true } });
+  else for (const b of ctx.current ? [ctx.current] : ctx.businesses) options.push({ label: `New contact "${who}"`, sublabel: `in ${b.name}`, color: b.color, pick: { createContact: true, subAccountId: b.id } });
   return { kind: 'clarify', question: people.length ? `Which ${who} do you mean for this ${action}?` : `No one called "${who}" yet. Create them?`, options };
 }
 

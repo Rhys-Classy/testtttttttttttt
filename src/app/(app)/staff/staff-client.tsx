@@ -12,7 +12,7 @@ export function AddStaff({ businesses }: { businesses: { id: string; name: strin
   const router = useRouter();
   return (
     <form action={(fd) => start(async () => { const r = await addStaffAction(fd); if (!r.ok) toast(r.error, 'error'); else { toast('Added'); router.refresh(); } })}
-      className="mb-4 grid gap-2 rounded-2xl border border-border bg-surface p-3 sm:grid-cols-[1fr_1fr_1fr_auto_auto]">
+      className="mb-4 grid grid-cols-1 gap-2 rounded-2xl border border-border bg-surface p-3 sm:grid-cols-[1fr_1fr_1fr_auto_auto]">
       <Input name="name" required placeholder="Name" />
       <Input name="role" placeholder="Role (e.g. Support worker)" />
       <Input name="phone" placeholder="Mobile" />

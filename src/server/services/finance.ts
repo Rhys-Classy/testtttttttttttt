@@ -546,10 +546,23 @@ export async function recordProviderPayment(tx: Tx, scope: Scope, input: {
 }
 
 async function afterPaymentSucceeded(tx: Tx, scope: Scope, payment: Payment, inv: Invoice) {
-  await reconcileInvoice(tx, scope, inv.id);
+  const updated = await reconcileInvoice(tx, scope, inv.id);
   if (inv.contactId) {
     const c = await getContact(tx, scope, inv.contactId);
     if (c.status !== 'customer') await updateContact(tx, scope, c.id, { status: 'customer' });
+    // Receipt: one per payment, by email, only if we have an address and they haven't opted out.
+    if (c.email && !c.emailOptOut && !payment.receiptSentAt) {
+      const b = await getBusiness(tx, scope.subAccountId);
+      const balance = balanceDue(updated);
+      await queueMessage(tx, scope, {
+        contactId: c.id, channel: 'email',
+        subject: `Receipt: ${formatMoney(payment.amountCents, payment.currency)} received for ${inv.number}`,
+        body: `Hi ${c.firstName || 'there'},\n\nThanks — we've received ${formatMoney(payment.amountCents, payment.currency)} for invoice ${inv.number}.`
+          + (balance > 0 ? `\nRemaining balance: ${formatMoney(balance, inv.currency)}.` : `\nThis invoice is now paid in full.`)
+          + `${payment.receiptUrl ? `\n\nCard receipt: ${payment.receiptUrl}` : ''}\n\nView invoice: ${invoiceUrl(inv.publicToken)}\n\n${b.tradingName ?? b.name}${b.abn ? ` · ABN ${b.abn}` : ''}`,
+      });
+      await tx.update(payments).set({ receiptSentAt: new Date() }).where(byTenant(payments, scope, payment.id));
+    }
   }
   await logActivity(tx, scope, { contactId: inv.contactId, entityType: 'payment', entityId: payment.id, type: 'payment', summary: `Payment received ${formatMoney(payment.amountCents, payment.currency)} for ${inv.number}` });
   await emit(tx, scope, 'payment.received', { entityType: 'payment', entityId: payment.id, contactId: inv.contactId, payload: { amountCents: payment.amountCents, invoiceId: inv.id, number: inv.number } });
@@ -581,6 +594,18 @@ export async function recordFailedPayment(tx: Tx, scope: Scope, input: { invoice
   await emit(tx, scope, 'payment.failed', { entityType: 'payment', entityId: payment.id, contactId: inv.contactId, payload: { invoiceId: inv.id, reason: input.reason } });
   await notify(tx, scope, { type: 'payment.failed', severity: 'urgent', title: `Payment failed on ${inv.number}`, body: input.reason ?? undefined, link: `/invoices/${inv.id}` });
   return payment;
+}
+
+/** Manual (non-Stripe) payment reversed, e.g. a bank transfer returned. */
+export async function refundManualPayment(tx: Tx, scope: Scope, paymentId: string) {
+  const [p] = await tx.select().from(payments).where(byTenant(payments, scope, paymentId));
+  must(p, 'Payment');
+  if (p.provider !== 'manual') throw new ValidationError('Refund card payments through Stripe.');
+  const [row] = await tx.update(payments).set({ refundedCents: p.amountCents, status: 'refunded', updatedAt: new Date() }).where(byTenant(payments, scope, p.id)).returning();
+  if (p.invoiceId) await reconcileInvoice(tx, scope, p.invoiceId);
+  await emit(tx, scope, 'payment.refunded', { entityType: 'payment', entityId: p.id, contactId: p.contactId, payload: { refundedCents: p.amountCents } });
+  await audit(tx, scope, 'payment.refund', 'payment', p.id, { amountCents: p.amountCents });
+  return row;
 }
 
 export async function recordRefund(tx: Tx, scope: Scope, input: { providerPaymentId: string; refundedCents: number }) {

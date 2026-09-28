@@ -37,14 +37,14 @@ export default async function TeamPage() {
       {ctx.isAccountAdmin ? (
         <Card><CardHeader title="Add a team member" subtitle="e.g. a head installer who only needs Classy Kitchen Facelifts" /><CardBody>
           <ActionForm action={inviteTeamMemberAction} resetOnSuccess className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Name"><Input name="name" required /></Field>
               <Field label="Email"><Input name="email" type="email" required /></Field>
               <Field label="Temporary password" hint="They should change it after first login."><Input name="password" type="text" required minLength={10} /></Field>
               <Field label="Role"><Select name="role" defaultValue="staff"><option value="staff">Staff — can view and edit</option><option value="viewer">Viewer — read only</option><option value="admin">Admin — can change settings</option></Select></Field>
             </div>
             <fieldset><legend className="mb-2 text-sm font-medium">Businesses they can open</legend>
-              <div className="grid gap-2 sm:grid-cols-2">{ctx.businesses.map((b) => <label key={b.id} className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm"><input type="checkbox" name="businesses" value={b.id} /><BusinessBadge business={b} full /></label>)}</div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{ctx.businesses.map((b) => <label key={b.id} className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm"><input type="checkbox" name="businesses" value={b.id} /><BusinessBadge business={b} full /></label>)}</div>
             </fieldset>
             <Button type="submit" variant="primary">Add team member</Button>
           </ActionForm>

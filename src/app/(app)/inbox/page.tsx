@@ -68,7 +68,7 @@ export default async function InboxPage({ searchParams }: { searchParams: SP }) 
 
   return (
     <div className="-mx-4 -mt-5 md:mx-0 md:mt-0">
-      <div className="grid h-[calc(100dvh-4rem-4rem)] overflow-hidden border-border bg-surface md:h-[calc(100dvh-7rem)] md:grid-cols-[22rem_1fr] md:rounded-2xl md:border">
+      <div className="grid grid-cols-1 h-[calc(100dvh-4rem-4rem)] overflow-hidden border-border bg-surface md:h-[calc(100dvh-7rem)] md:grid-cols-[22rem_1fr] md:rounded-2xl md:border">
         <aside className={cn('flex min-h-0 flex-col border-r border-border', showThread && 'hidden md:flex')}>
           <div className="border-b border-border p-3">
             <div className="mb-2 flex items-center justify-between"><h1 className="text-lg font-semibold">Inbox</h1><Link href="/inbox?compose=1" className="text-sm font-medium text-accent">New</Link></div>

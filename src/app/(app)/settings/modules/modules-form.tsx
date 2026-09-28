@@ -14,7 +14,7 @@ export function ModulesForm({ subAccountId, modules, enabled }: { subAccountId: 
   const router = useRouter();
   return (
     <div className="space-y-4">
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {modules.map((m) => {
           const active = m.core || on.has(m.key);
           return (

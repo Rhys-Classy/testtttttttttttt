@@ -7,28 +7,17 @@ import { sessions } from '@/db/schema';
 import { randomToken, sha256 } from '@/lib/crypto';
 import { verifyPassword } from '@/lib/auth/password';
 import { env } from '@/lib/env';
+import { rateLimited } from '@/lib/rate-limit';
 
 export const SESSION_COOKIE = 'bos_session';
 const SESSION_DAYS = 30;
 
-const attempts = new Map<string, { count: number; resetAt: number }>();
-
-/** Simple in-memory brute-force brake: 8 tries per 10 minutes per email+IP. */
-function rateLimited(key: string): boolean {
-  const now = Date.now();
-  const a = attempts.get(key);
-  if (!a || a.resetAt < now) {
-    attempts.set(key, { count: 1, resetAt: now + 10 * 60_000 });
-    return false;
-  }
-  a.count++;
-  return a.count > 8;
-}
 
 export async function login(email: string, password: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const h = await headers();
   const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local';
-  if (rateLimited(`${email.toLowerCase()}|${ip}`)) return { ok: false, error: 'Too many attempts. Try again in 10 minutes.' };
+  // Brute-force brake: 8 tries per 10 minutes per email+IP.
+  if (rateLimited(`login|${email.toLowerCase()}|${ip}`, 8, 10 * 60_000)) return { ok: false, error: 'Too many attempts. Try again in 10 minutes.' };
   const found = await withAnonymous(async (tx) =>
     (await tx.execute<{ id: string; password_hash: string }>(sql`select * from app.auth_find_user(${email})`)).rows[0]);
   // Always run a hash comparison so response time doesn't reveal whether the email exists.

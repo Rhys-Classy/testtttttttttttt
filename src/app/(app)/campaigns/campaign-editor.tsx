@@ -47,9 +47,9 @@ export function CampaignEditor({ initial, businesses, optsBy, locked }: {
   });
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_22rem]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_22rem]">
       <div className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_10rem]">
           <Field label="Campaign name"><Input value={name} onChange={(e) => setName(e.target.value)} disabled={locked} /></Field>
           <Field label="Channel"><Select value={channel} onChange={(e) => setChannel(e.target.value as 'email' | 'sms')} disabled={locked}><option value="email">Email</option><option value="sms">SMS</option></Select></Field>
         </div>

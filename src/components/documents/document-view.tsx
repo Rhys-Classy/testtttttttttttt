@@ -113,7 +113,7 @@ export function DocumentView({ doc, lines, business, customer }: { doc: Doc; lin
         </div>
 
         {doc.notes || doc.terms || (doc.kind === 'invoice' && business.bankDetails) ? (
-          <footer className="mt-8 grid gap-6 border-t border-slate-200 pt-6 text-sm sm:grid-cols-2">
+          <footer className="mt-8 grid grid-cols-1 gap-6 border-t border-slate-200 pt-6 text-sm sm:grid-cols-2">
             {doc.kind === 'invoice' && business.bankDetails ? <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">How to pay</p><p className="mt-1 whitespace-pre-line">{business.bankDetails}</p></div> : null}
             {doc.notes ? <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Notes</p><p className="mt-1 whitespace-pre-line">{doc.notes}</p></div> : null}
             {doc.terms ? <div className="sm:col-span-2"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Terms</p><p className="mt-1 whitespace-pre-line text-slate-500">{doc.terms}</p></div> : null}

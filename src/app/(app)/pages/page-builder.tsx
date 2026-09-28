@@ -72,7 +72,7 @@ export function PageBuilder({ initial, businesses, formsBy, appUrl }: {
             <div className="mb-3 flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-wider text-muted">{s.type}</p>
               <div className="flex gap-1"><button onClick={() => move(i, -1)} className="p-1.5 text-muted"><ArrowUp className="size-4" /></button><button onClick={() => move(i, 1)} className="p-1.5 text-muted"><ArrowDown className="size-4" /></button><button onClick={() => setSections((x) => x.filter((_, j) => j !== i))} className="p-1.5 text-muted hover:text-danger"><Trash2 className="size-4" /></button></div>
             </div>
-            {s.type === 'hero' ? (<div className="grid gap-2 sm:grid-cols-2">
+            {s.type === 'hero' ? (<div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Input value={s.heading} onChange={(e) => set(i, { heading: e.target.value })} placeholder="Heading" className="sm:col-span-2" />
               <Textarea value={s.subheading ?? ''} onChange={(e) => set(i, { subheading: e.target.value })} rows={2} className="sm:col-span-2" />
               <Input value={s.buttonLabel ?? ''} onChange={(e) => set(i, { buttonLabel: e.target.value })} placeholder="Button label" />
@@ -81,12 +81,12 @@ export function PageBuilder({ initial, businesses, formsBy, appUrl }: {
             </div>) : null}
             {s.type === 'heading' ? <Input value={s.text} onChange={(e) => set(i, { text: e.target.value })} /> : null}
             {s.type === 'text' ? <Textarea value={s.body} onChange={(e) => set(i, { body: e.target.value })} rows={4} /> : null}
-            {s.type === 'image' ? <div className="grid gap-2 sm:grid-cols-2"><Input value={s.url} onChange={(e) => set(i, { url: e.target.value })} placeholder="Image URL" /><Input value={s.alt ?? ''} onChange={(e) => set(i, { alt: e.target.value })} placeholder="Description" /></div> : null}
-            {s.type === 'button' ? <div className="grid gap-2 sm:grid-cols-2"><Input value={s.label} onChange={(e) => set(i, { label: e.target.value })} /><Input value={s.href} onChange={(e) => set(i, { href: e.target.value })} /></div> : null}
+            {s.type === 'image' ? <div className="grid grid-cols-1 gap-2 sm:grid-cols-2"><Input value={s.url} onChange={(e) => set(i, { url: e.target.value })} placeholder="Image URL" /><Input value={s.alt ?? ''} onChange={(e) => set(i, { alt: e.target.value })} placeholder="Description" /></div> : null}
+            {s.type === 'button' ? <div className="grid grid-cols-1 gap-2 sm:grid-cols-2"><Input value={s.label} onChange={(e) => set(i, { label: e.target.value })} /><Input value={s.href} onChange={(e) => set(i, { href: e.target.value })} /></div> : null}
             {s.type === 'form' ? <Select value={s.formId} onChange={(e) => set(i, { formId: e.target.value })}><option value="">Choose a form…</option>{formsList.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</Select> : null}
             {s.type === 'testimonials' ? (
               <div className="space-y-2">
-                {s.items.map((t, k) => <div key={k} className="grid gap-2 sm:grid-cols-[1fr_12rem_2rem]"><Input value={t.quote} onChange={(e) => set(i, { items: s.items.map((x, m) => (m === k ? { ...x, quote: e.target.value } : x)) })} /><Input value={t.name} onChange={(e) => set(i, { items: s.items.map((x, m) => (m === k ? { ...x, name: e.target.value } : x)) })} /><button onClick={() => set(i, { items: s.items.filter((_, m) => m !== k) })} className="text-muted"><Trash2 className="size-4" /></button></div>)}
+                {s.items.map((t, k) => <div key={k} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_12rem_2rem]"><Input value={t.quote} onChange={(e) => set(i, { items: s.items.map((x, m) => (m === k ? { ...x, quote: e.target.value } : x)) })} /><Input value={t.name} onChange={(e) => set(i, { items: s.items.map((x, m) => (m === k ? { ...x, name: e.target.value } : x)) })} /><button onClick={() => set(i, { items: s.items.filter((_, m) => m !== k) })} className="text-muted"><Trash2 className="size-4" /></button></div>)}
                 <Button size="sm" variant="ghost" onClick={() => set(i, { items: [...s.items, { quote: '', name: '' }] })}><Plus className="size-4" />Testimonial</Button>
               </div>
             ) : null}

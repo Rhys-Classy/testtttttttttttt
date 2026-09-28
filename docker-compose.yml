@@ -1,0 +1,58 @@
+# Self-hosting: `cp .env.example .env`, fill in the CHANGE_ME values, then `docker compose up -d`.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bos_admin
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?set POSTGRES_ADMIN_PASSWORD}
+      POSTGRES_DB: bos
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bos_admin -d bos"]
+      interval: 5s
+      retries: 20
+
+  migrate:
+    build: { context: ., target: tools }
+    command: sh -c "npx tsx src/db/migrate.ts && npx tsx src/db/seed.ts"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://bos_app:${APP_DB_PASSWORD}@db:5432/bos
+      DATABASE_ADMIN_URL: postgres://bos_admin:${POSTGRES_ADMIN_PASSWORD}@db:5432/bos
+    depends_on:
+      db: { condition: service_healthy }
+    restart: "no"
+
+  app:
+    build: { context: ., target: app }
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://bos_app:${APP_DB_PASSWORD}@db:5432/bos
+      STORAGE_DIR: /app/storage
+    volumes:
+      - storage:/app/storage
+    ports:
+      - "3000:3000"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  worker:
+    build: { context: ., target: tools }
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://bos_app:${APP_DB_PASSWORD}@db:5432/bos
+      STORAGE_DIR: /app/storage
+    volumes:
+      - storage:/app/storage
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+volumes:
+  db-data:
+  storage:
