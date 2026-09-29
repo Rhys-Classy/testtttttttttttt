@@ -10,7 +10,7 @@ export async function GET() {
   } catch (e) {
     const err = e as { code?: string; name?: string; message?: string; cause?: { code?: string; message?: string } };
     console.error(JSON.stringify({ level: 'error', context: 'health', message: err.message, code: err.code ?? err.cause?.code, cause: err.cause?.message }));
-    const reason = err.cause?.code ?? err.code ?? (/APP_DB_PASSWORD|No database configured/.test(err.message ?? '') ? 'config' : err.name ?? 'error');
+    const reason = err.cause?.code ?? err.code ?? (/APP_DB_PASSWORD/.test(err.message ?? '') ? 'config:app-password' : /No database configured/.test(err.message ?? '') ? 'config:database' : err.name ?? 'error');
     return NextResponse.json({ ok: false, reason }, { status: 503 });
   }
 }
