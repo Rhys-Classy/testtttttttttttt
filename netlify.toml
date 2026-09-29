@@ -11,3 +11,7 @@
 
 [functions]
   directory = "netlify/functions"
+
+# Next.js runtime (server rendering, API routes, proxy). Declared explicitly so API/zip deploys get it too.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

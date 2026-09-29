@@ -42,6 +42,7 @@
   },
   "devDependencies": {
     "@netlify/functions": "^6.0.0",
+    "@netlify/plugin-nextjs": "^5.16.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.20.4",
     "@types/nodemailer": "^8.0.2",
