@@ -17,7 +17,7 @@ const ENTITY_WORDS: Record<string, string> = {
   integration: 'integration', api_key: 'API key', role: 'role', account_member: 'person', business_member: 'access', business: 'business', user: 'account',
 };
 
-const PROVIDER_NAMES: Record<string, string> = { stripe: 'Stripe', smtp: 'Email (SMTP)', twilio: 'SMS (Twilio)', anthropic: 'AI assistant', website: 'Website forms', google: 'Google' };
+const PROVIDER_NAMES: Record<string, string> = { stripe: 'Stripe', smtp: 'Email (SMTP)', twilio: 'SMS (Twilio)', anthropic: 'AI assistant', website: 'Website forms', google_ads_leads: 'Google Ads lead forms', google: 'Google' };
 
 const AUTH: Record<string, string> = {
   'auth.login': 'Logged in',

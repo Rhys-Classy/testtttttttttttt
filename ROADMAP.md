@@ -16,6 +16,7 @@ Honest status. ✅ done and tested · 🟡 works, with a stated gap · ❌ not b
 | 8 Reporting | Revenue, sales, leads, customers, campaigns; AU financial year | ✅ |
 | 9 AI | Assistant with permission-filtered tools and confirm-before-write, cross-business answers | 🟡 no scheduled AI summaries / task suggestions yet |
 | — | REST API v1 with keys, calendar feed | ✅ read + create for contacts/leads/tasks; invoices/payments read-only |
+| — | Lead sources: website webhook, Google Ads lead forms (→ contact + lead + pipeline deal) | ✅ |
 
 ## Definition of Done by feature
 
@@ -58,6 +59,7 @@ Columns: UI · backend · database · validation · permissions · error handlin
 - Push notifications on the installed phone app
 - API: create/send invoices, record payments, webhooks out (subscriptions)
 - AI: scheduled summaries, suggested tasks, cross-business weekly briefing
+- Google Ads offline conversions (send won deals back to Google using the stored `gclid`)
 - Field-level permissions (e.g. hide cost prices from Staff) — permissions are per module/action today
 
 ## Next up (recommended order)

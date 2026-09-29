@@ -93,6 +93,7 @@ curl "https://os.example.com.au/api/v1/invoices?status=overdue&limit=50&cursor=$
 | `/api/webhooks/stripe/{integrationId}` | Stripe signature (per business signing secret); idempotent by event id |
 | `/api/webhooks/twilio/{integrationId}` | Twilio request signature |
 | `/api/webhooks/website/{integrationId}?token=…` | per-integration token (constant-time compare), rate limited |
+| `/api/webhooks/google-ads/{integrationId}` | `google_key` in the body (constant-time compare), rate limited; idempotent by `lead_id` |
 
 ## Internal endpoints (the app itself)
 

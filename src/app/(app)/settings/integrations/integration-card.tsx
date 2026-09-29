@@ -13,7 +13,23 @@ import { Badge } from '@/components/ui/badge';
 type Def = { id: string; label: string; description: string; status: string; auth: string; fields: { key: string; label: string; secret?: boolean; required?: boolean; placeholder?: string; help?: string }[]; docsUrl?: string };
 type Conn = { id: string; status: string; config: Record<string, unknown>; secretHints: Record<string, string>; lastError: string | null } | null;
 
-export function IntegrationCard({ def, conn, scope, subAccountId, webhookUrl }: { def: Def; conn: Conn; scope: 'global' | 'sub_account'; subAccountId?: string; webhookUrl?: string | null }) {
+const WEBHOOK_HELP: Record<string, string> = {
+  stripe: 'Stripe webhook URL (events: checkout.session.completed, payment_intent.succeeded, payment_intent.payment_failed, charge.refunded)',
+  twilio: 'Set this as the “A message comes in” webhook on your Twilio number',
+  google_ads_leads: 'Google Ads → your lead form → Lead delivery → Webhook integration: paste the URL and key, then click “Send test data”',
+};
+
+function CopyRow({ label, value }: { label?: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      {label ? <span className="shrink-0 text-muted">{label}</span> : null}
+      <code className="min-w-0 flex-1 truncate">{value}</code>
+      <button type="button" aria-label={`Copy ${label ?? 'URL'}`} onClick={() => { navigator.clipboard.writeText(value); toast('Copied'); }} className="p-1 text-accent"><Copy className="size-4" /></button>
+    </div>
+  );
+}
+
+export function IntegrationCard({ def, conn, scope, subAccountId, webhookUrl, webhookKey }: { def: Def; conn: Conn; scope: 'global' | 'sub_account'; subAccountId?: string; webhookUrl?: string | null; webhookKey?: string | null }) {
   const [open, setOpen] = useState(false);
   const [, start] = useTransition();
   const router = useRouter();
@@ -33,8 +49,11 @@ export function IntegrationCard({ def, conn, scope, subAccountId, webhookUrl }: 
       </div>
       {connected && webhookUrl ? (
         <div className="mt-3 rounded-xl bg-surface-2 p-3 text-xs">
-          <p className="mb-1 font-medium">{def.id === 'stripe' ? 'Stripe webhook URL (events: checkout.session.completed, payment_intent.succeeded, payment_intent.payment_failed, charge.refunded)' : def.id === 'twilio' ? 'Set this as the “A message comes in” webhook on your Twilio number' : 'POST your website form here'}</p>
-          <div className="flex items-center gap-2"><code className="min-w-0 flex-1 truncate">{webhookUrl}</code><button onClick={() => { navigator.clipboard.writeText(webhookUrl); toast('Copied'); }} className="text-accent"><Copy className="size-4" /></button></div>
+          <p className="mb-1 font-medium">{WEBHOOK_HELP[def.id] ?? 'POST your website form here'}</p>
+          <div className="space-y-1">
+            <CopyRow label={webhookKey ? 'URL' : undefined} value={webhookUrl} />
+            {webhookKey ? <CopyRow label="Key" value={webhookKey} /> : null}
+          </div>
         </div>
       ) : null}
       {open ? (

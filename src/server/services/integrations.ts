@@ -3,6 +3,7 @@ import type { Tx } from '@/db/client';
 import { integrations } from '@/db/schema';
 import { decryptJson, encryptJson, maskSecret, randomToken } from '@/lib/crypto';
 import { getProvider } from '@/lib/integrations/catalog';
+import { parseMoney } from '@/lib/money';
 import { Scope, ValidationError, getBusiness, must } from './_common';
 
 export type Integration = typeof integrations.$inferSelect;
@@ -56,6 +57,10 @@ export async function connectBusinessIntegration(tx: Tx, scope: Scope, providerI
     if (f.required && !(f.secret ? merged[f.key] : config[f.key])) throw new ValidationError(`${f.label} is required.`);
   }
   if (providerId === 'website' && !config.token) config.token = (existing?.config as Record<string, unknown>)?.token ?? randomToken(18);
+  if (providerId === 'google_ads_leads') {
+    if (config.dealValue && parseMoney(String(config.dealValue)) == null) throw new ValidationError('Typical job value should be a dollar amount, like 15000.');
+    config.key = (existing?.config as Record<string, unknown>)?.key ?? randomToken(18);
+  }
   if (providerId === 'stripe' && merged.secretKey && !/^(sk|rk)_(test|live)_/.test(merged.secretKey)) {
     throw new ValidationError('That does not look like a Stripe secret key (sk_… or rk_…).');
   }

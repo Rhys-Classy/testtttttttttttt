@@ -27,7 +27,7 @@ The five businesses are **seed data**, not code. Add, rename or archive business
 | **Command centre** `Ctrl/⌘ K` | Natural language: *"Create invoice for John for $2,500 plus GST"*, *"Create task to call Steve tomorrow"*, *"Book meeting with John Friday at 2pm"*, *"Show overdue invoices"*, *"Show leads from Facebook"*, *"Open Classy Kitchen Facelifts"*. Asks which one when a name exists in two businesses. Financial actions create **drafts** for review |
 | **Quick add** `+` | Contact, lead, deal, task, appointment, quote, invoice, payment, note, job — minimal fields |
 | **CRM** | Contacts + companies, tags, custom fields, timeline, notes, call log, documents, per-business terminology |
-| **Leads & pipeline** | Lead sources/statuses, convert to deal, unlimited pipelines, drag-and-drop kanban + list |
+| **Leads & pipeline** | Lead sources/statuses, convert to deal, unlimited pipelines, drag-and-drop kanban + list. Google Ads lead forms land straight in the pipeline |
 | **Quotes** | Line items, products, discounts, GST inc/ex, online **accept** → auto job + (deposit) invoice + deal won |
 | **Invoices & payments** | Tax Invoice layout, ABN checks, Stripe **Pay Now**, manual payments, partial payments, overdue sweep, automatic reminders, receipts, refunds |
 | **Jobs** | Customer → deal → quote → job → invoice → payment, status stepper, photos, notes, schedule |

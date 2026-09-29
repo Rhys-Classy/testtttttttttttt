@@ -14,6 +14,7 @@ import { saveForm, submitForm, saveCampaign, scheduleCampaign, dispatchCampaign,
 import { advanceRun, processEvent, saveWorkflow, setWorkflowStatus } from '@/server/services/automation';
 import { connectBusinessIntegration } from '@/server/services/integrations';
 import { handleStripeWebhook } from '@/server/services/stripe';
+import { handleGoogleAdsLead, parseGoogleLead } from '@/server/services/google-ads';
 import { deliverDueMessages } from '@/server/services/delivery';
 import { asSystem, asUser, createFixture, type Fixture } from './helpers';
 
@@ -155,6 +156,79 @@ describe('Stripe webhooks', () => {
     await expect(asSystem(f.bizA, (tx, s) => handleStripeWebhook(tx, s, integration.id, payload, header))).rejects.toThrow(/not found/i);
     const b = await asUser(f.ownerId, f.bizB, (tx, s) => getInvoice(tx, s, invB.id));
     expect(b.amountPaidCents).toBe(0);
+  });
+});
+
+describe('Google Ads lead forms', () => {
+  const lead = (key: string, leadId: string, extra: Record<string, unknown> = {}) => ({
+    lead_id: leadId, google_key: key, api_version: '1.0', form_id: 111, campaign_id: 222, adgroup_id: 333, gcl_id: 'gclid-abc',
+    user_column_data: [
+      { column_id: 'FULL_NAME', column_name: 'Full Name', string_value: 'Olivia Harper' },
+      { column_id: 'EMAIL', column_name: 'User Email', string_value: 'olivia@gads.test' },
+      { column_id: 'PHONE_NUMBER', column_name: 'User Phone', string_value: '+61412000111' },
+      { column_id: 'POSTAL_CODE', column_name: 'Postal Code', string_value: '3840' },
+      { column_name: 'What would you like updated?', string_value: 'Doors and benchtop' },
+    ],
+    ...extra,
+  });
+
+  it('parses standard columns and keeps custom answers', () => {
+    const p = parseGoogleLead(lead('k', 'x'));
+    expect(p).toMatchObject({ name: 'Olivia Harper', email: 'olivia@gads.test', phone: '+61412000111', address: { postcode: '3840' } });
+    expect(p.answers).toEqual(['What would you like updated?: Doors and benchtop']);
+  });
+
+  it('creates contact + lead + deal once, ignores tests and wrong keys', async () => {
+    const integration = await asUser(f.ownerId, f.bizA, (tx, s) => connectBusinessIntegration(tx, s, 'google_ads_leads', { dealValue: '15000' }));
+    const key = String(integration.config.key);
+    expect(key.length).toBeGreaterThan(20);
+    // Reconnecting keeps the key Google already has.
+    const again = await asUser(f.ownerId, f.bizA, (tx, s) => connectBusinessIntegration(tx, s, 'google_ads_leads', { dealValue: '$12,000' }));
+    expect(again.config.key).toBe(key);
+    const run = (body: Record<string, unknown>) => asSystem(f.bizA, (tx, s) => handleGoogleAdsLead(tx, s, integration.id, body));
+    const leadCount = () => asSystem(f.bizA, async (tx) => (await tx.select().from(leads).where(eq(leads.source, 'google'))).length);
+
+    expect((await run(lead('wrong-key', 'L1'))).status).toBe('unauthorised');
+    expect((await run(lead(key, 'TEST', { is_test: true }))).status).toBe('test');
+    expect(await leadCount()).toBe(0);
+
+    const r = await run(lead(key, 'L1'));
+    expect(r.status).toBe('created');
+    if (r.status !== 'created') return;
+    expect((await run(lead(key, 'L1'))).status).toBe('duplicate');
+    expect(await leadCount()).toBe(1);
+
+    const check = await asSystem(f.bizA, async (tx, s) => ({
+      lead: (await tx.select().from(leads).where(eq(leads.id, r.leadId)))[0],
+      deal: (await tx.select().from(deals).where(eq(deals.id, r.dealId)))[0],
+      contact: (await tx.select().from(contacts).where(eq(contacts.id, r.contactId)))[0],
+      evs: await tx.select().from(events).where(and(eq(events.type, 'lead.created'), eq(events.entityId, r.leadId))),
+      firstStage: (await getStages(tx, s, (await tx.select().from(deals).where(eq(deals.id, r.dealId)))[0].pipelineId))[0],
+      logged: await tx.select().from(webhookEvents).where(and(eq(webhookEvents.provider, 'google_ads'), eq(webhookEvents.providerEventId, 'L1'))),
+    }));
+    expect(check.contact).toMatchObject({ firstName: 'Olivia', lastName: 'Harper', email: 'olivia@gads.test', source: 'google' });
+    expect(check.contact.address).toMatchObject({ postcode: '3840' });
+    expect(check.lead).toMatchObject({ status: 'new', dealId: r.dealId, valueCents: 12_000_00 });
+    expect(check.lead.notes).toContain('Doors and benchtop');
+    expect(check.lead.customFields).toMatchObject({ google_lead_id: 'L1', gclid: 'gclid-abc', google_campaign_id: '222' });
+    expect(check.deal).toMatchObject({ contactId: r.contactId, stageId: check.firstStage.id, valueCents: 12_000_00, source: 'google' });
+    expect(check.evs).toHaveLength(1);
+    expect(check.logged).toHaveLength(1);
+    expect(check.logged[0].payload).not.toHaveProperty('google_key');
+
+    // A second enquiry from the same person reuses the contact.
+    const r2 = await run(lead(key, 'L2'));
+    expect(r2.status === 'created' && r2.contactId).toBe(r.contactId);
+  });
+
+  it("business A's Google Ads URL can't write into business B", async () => {
+    const integration = await asUser(f.ownerId, f.bizA, (tx, s) => connectBusinessIntegration(tx, s, 'google_ads_leads', {}));
+    const res = await asSystem(f.bizB, (tx, s) => handleGoogleAdsLead(tx, s, integration.id, lead(String(integration.config.key), 'CROSS')));
+    expect(res.status).toBe('unauthorised');
+  });
+
+  it('rejects a job value that is not money', async () => {
+    await expect(asUser(f.ownerId, f.bizA, (tx, s) => connectBusinessIntegration(tx, s, 'google_ads_leads', { dealValue: 'lots' }))).rejects.toThrow(/dollar amount/);
   });
 });
 

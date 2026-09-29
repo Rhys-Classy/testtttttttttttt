@@ -4,7 +4,7 @@
  *  - 'global': one connection for the whole master account (AI provider, storage)
  */
 
-export type IntegrationCategory = 'payments' | 'email' | 'sms' | 'calendar' | 'social' | 'website' | 'ai' | 'storage' | 'accounting';
+export type IntegrationCategory = 'payments' | 'email' | 'sms' | 'calendar' | 'social' | 'website' | 'ads' | 'ai' | 'storage' | 'accounting';
 
 export type IntegrationField = {
   key: string;
@@ -94,6 +94,11 @@ export const PROVIDERS: ProviderDef[] = [
     fields: [{ key: 'defaultSource', label: 'Lead source', placeholder: 'website' }],
   },
   {
+    id: 'google_ads_leads', label: 'Google Ads lead forms', category: 'ads', scope: 'sub_account', auth: 'webhook', status: 'ready',
+    description: 'Every lead from a Google Ads lead form arrives instantly: contact matched or created, lead logged, deal added to the first pipeline stage, New lead automations run.',
+    fields: [{ key: 'dealValue', label: 'Typical job value ($)', placeholder: '15000', help: 'New deals start at this value so the pipeline shows real money. Leave blank for $0.' }],
+  },
+  {
     id: 'anthropic', label: 'AI assistant (Claude)', category: 'ai', scope: 'global', auth: 'api_key', status: 'ready',
     description: 'Powers the assistant across all businesses. One key for the whole account.',
     fields: [
@@ -112,6 +117,6 @@ export function getProvider(id: string): ProviderDef | undefined {
 }
 
 export const CATEGORY_LABELS: Record<IntegrationCategory, string> = {
-  payments: 'Payments', email: 'Email', sms: 'SMS', calendar: 'Calendar', social: 'Social', website: 'Website',
+  payments: 'Payments', email: 'Email', sms: 'SMS', calendar: 'Calendar', social: 'Social', website: 'Website', ads: 'Advertising',
   ai: 'AI', storage: 'Storage', accounting: 'Accounting',
 };
