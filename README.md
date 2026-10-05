@@ -123,6 +123,7 @@ Environment variables (Project configuration → Environment variables):
 | `APP_DB_PASSWORD` | 30+ random characters (secret) — the app's restricted database login |
 | `CRON_SECRET` | 32+ random characters (secret) |
 | `SEED_OWNER_EMAIL`, `SEED_OWNER_PASSWORD`, `SEED_OWNER_NAME` | first login, created on the first sign-in attempt while the database is empty |
+| `SEED_DEMO` | `1` to fill the businesses with fake demo customers, quotes, invoices and jobs on first sign-in (for showing the app). Leave unset for real use |
 | `STORAGE_DRIVER` | `netlify-blobs` |
 
 How the database stays locked down on Netlify: the platform gives the app the database owner's connection. The app uses it only to switch on its own restricted `bos_app` login (first request after a deploy) and to create the first owner on an empty database; every page and API request then runs as `bos_app`, so row level security applies exactly as on a self-hosted server.

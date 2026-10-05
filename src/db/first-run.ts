@@ -23,7 +23,7 @@ export function ensureFirstOwner(): Promise<void> {
     }
     if (!empty) return;
     const { seed } = await import('./seed');
-    await seed({ adminUrl: ownerDatabaseUrl() });
+    await seed({ adminUrl: ownerDatabaseUrl(), demo: process.env.SEED_DEMO === '1' });
   })().catch((e) => {
     g.__bosFirstRun = undefined;
     throw e;
