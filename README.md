@@ -173,3 +173,7 @@ npm run build
 ## Status
 
 See **ROADMAP.md** for the per-feature Definition-of-Done table and what is clearly not built yet (Gmail/Microsoft OAuth, two-way calendar sync, Facebook/Instagram, password-reset emails, email tracking).
+
+## Demo container (for showing the app)
+
+`docker/demo/Dockerfile` runs the app with its own throwaway Postgres, filled with fake demo data on every start (Render free web service: runtime Docker, Dockerfile path `./docker/demo/Dockerfile`, env `APP_URL`, `SEED_OWNER_EMAIL`, `SEED_OWNER_PASSWORD`, `SEED_OWNER_NAME`, `SEED_ACCOUNT_NAME`). Data resets whenever it restarts and email/SMS only go to the log. **Never use it for real business data.**
