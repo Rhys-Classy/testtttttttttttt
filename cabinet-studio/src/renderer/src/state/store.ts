@@ -139,6 +139,8 @@ export interface State {
   /** Bumped to ask the viewport to frame the room / selection. */
   frameRequest: number;
   contextMenu: { x: number; y: number } | null;
+  /** In-app confirmation (native confirm() is unavailable in some hosts). */
+  confirmState: { message: string; okLabel: string; resolve: (ok: boolean) => void } | null;
 
   commit: (fn: (d: ProjectDocument) => ProjectDocument) => void;
   preview: (fn: (d: ProjectDocument) => ProjectDocument) => void;
@@ -187,7 +189,8 @@ export const useStore = create<State>((set, get) => ({
   snap: prefs.snap,
   layers: prefs.layers,
   showEdges: prefs.showEdges,
-  panels: prefs.panels,
+  // Narrow windows start with the side panels closed so the viewport fits.
+  panels: typeof window !== 'undefined' && window.innerWidth < 900 ? { ...prefs.panels, left: false, right: false } : prefs.panels,
   gpu: null,
   stats: { fps: 0, drawCalls: 0, triangles: 0, frameMs: 0 },
   toasts: [],
@@ -198,6 +201,7 @@ export const useStore = create<State>((set, get) => ({
   measure: { a: null, b: null, cursor: null },
   frameRequest: 0,
   contextMenu: null,
+  confirmState: null,
 
   commit: (fn) => {
     const s = get();
@@ -274,6 +278,23 @@ export const useStore = create<State>((set, get) => ({
 }));
 
 export const isDirty = (s: State): boolean => s.doc !== s.savedDoc;
+
+/** Ask the user to confirm in an in-app dialog; resolves true when they accept. */
+export function askConfirm(message: string, okLabel = 'Continue'): Promise<boolean> {
+  return new Promise((resolve) => {
+    useStore.getState().confirmState?.resolve(false);
+    useStore.setState({
+      confirmState: {
+        message,
+        okLabel,
+        resolve: (ok) => {
+          useStore.setState({ confirmState: null });
+          resolve(ok);
+        },
+      },
+    });
+  });
+}
 
 // ───────────────────────── Derived data (memoised per document) ─────────────────────────
 

@@ -124,10 +124,12 @@ button {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 10px;
+  padding: 0 16px;
   background: var(--bg-0);
   border-bottom: 1px solid var(--line);
   min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .brand {
@@ -991,9 +993,11 @@ textarea.textarea {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 0 10px;
+  padding: 0 16px;
   background: var(--bg-0);
   border-top: 1px solid var(--line);
+  overflow-x: auto;
+  overflow-y: hidden;
   color: var(--text-3);
   font-size: 12px;
   white-space: nowrap;
@@ -1250,4 +1254,11 @@ input[type='range'] {
 .sheet-preview figcaption {
   color: var(--text-2);
   font-size: 12px;
+}
+
+.panel:not(.right) .panel-body {
+  padding-left: 16px;
+}
+.panel.right .panel-body {
+  padding-right: 16px;
 }

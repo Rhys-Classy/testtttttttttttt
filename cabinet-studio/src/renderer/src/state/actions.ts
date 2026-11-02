@@ -42,7 +42,7 @@ import {
 } from '@engine/index';
 import type { MenuCommand } from '@shared/ipc';
 import { platform } from '../platform/bridge';
-import { derive, deriver, isDirty, useStore } from './store';
+import { askConfirm, derive, deriver, isDirty, useStore } from './store';
 
 const S = () => useStore.getState();
 
@@ -228,7 +228,7 @@ export function loadProjectText(text: string, path: string | null, name: string)
 }
 
 export async function openProjectFlow(): Promise<void> {
-  if (isDirty(S()) && !window.confirm('Discard unsaved changes to this project?')) return;
+  if (isDirty(S()) && !(await askConfirm('Discard unsaved changes to this project?', 'Discard and open'))) return;
   try {
     const f = await platform.openProject();
     if (f) loadProjectText(f.content, f.path, f.name);
@@ -369,8 +369,10 @@ export function runCommand(cmd: MenuCommand): void {
   const s = S();
   switch (cmd) {
     case 'new':
-      if (isDirty(s) && !window.confirm('Discard unsaved changes and start a new project?')) return;
-      useStore.setState({ dialog: 'new-project' });
+      void (async () => {
+        if (isDirty(s) && !(await askConfirm('Discard unsaved changes and start a new project?', 'Discard and start new'))) return;
+        useStore.setState({ dialog: 'new-project' });
+      })();
       return;
     case 'open':
       void openProjectFlow();

@@ -4,7 +4,7 @@ import { isDesktop, platform } from './platform/bridge';
 import { checkRecovery, deleteSelection, duplicateSelection, mirrorSelection, openFromPath, rotateSelection, runCommand, startAutosave } from './state/actions';
 import { isDirty, savePrefs, useDerived, useStore } from './state/store';
 import { BottomBar } from './ui/BottomBar';
-import { ContextMenu, Dialogs, Toasts } from './ui/Dialogs';
+import { ConfirmDialog, ContextMenu, Dialogs, Toasts } from './ui/Dialogs';
 import { LeftPanel } from './ui/LeftPanel';
 import { RightPanel } from './ui/RightPanel';
 import { TopBar } from './ui/TopBar';
@@ -21,7 +21,7 @@ function editingText(e: KeyboardEvent): boolean {
 function onKey(e: KeyboardEvent): void {
   if (editingText(e)) return;
   const s = S();
-  if (s.dialog) return;
+  if (s.dialog || s.confirmState) return;
   if (s.view === 'walk' && ['w', 'a', 's', 'd', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(e.key.toLowerCase())) return;
   const ctrl = e.ctrlKey || e.metaKey;
   const k = e.key.toLowerCase();
@@ -252,6 +252,7 @@ export function App() {
       </div>
       <BottomBar />
       <Dialogs />
+      <ConfirmDialog />
       <ContextMenu />
     </div>
   );

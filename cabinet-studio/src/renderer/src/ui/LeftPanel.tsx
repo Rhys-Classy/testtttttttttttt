@@ -13,7 +13,7 @@ import {
   type MaterialSlot,
 } from '@engine/index';
 import { addFromLibrary, type LibraryDrag } from '../state/actions';
-import { useStore } from '../state/store';
+import { askConfirm, useStore } from '../state/store';
 import { libraryDrag } from '../viewport/Viewport';
 import { wallName } from '../viewport/views';
 import { NumberField, Row, Section } from './controls';
@@ -132,8 +132,8 @@ function RoomTab() {
         </div>
         <button
           className="btn primary block"
-          onClick={() => {
-            if (loop && !window.confirm('Replace the current walls with a rectangular room? Cabinets are kept; windows and doors are removed.')) return;
+          onClick={async () => {
+            if (loop && !(await askConfirm('Replace the current walls with a rectangular room? Cabinets are kept; windows and doors are removed.', 'Rebuild room'))) return;
             s.commit((d) => setRectangularRoom(d, size.width, size.depth, size.height, size.thickness));
             useStore.setState({ frameRequest: useStore.getState().frameRequest + 1 });
           }}

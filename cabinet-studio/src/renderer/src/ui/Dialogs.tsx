@@ -478,6 +478,29 @@ export function Dialogs() {
   }
 }
 
+export function ConfirmDialog() {
+  const c = useStore((s) => s.confirmState);
+  if (!c) return null;
+  return (
+    <Modal
+      title="Please confirm"
+      onClose={() => c.resolve(false)}
+      footer={
+        <>
+          <button className="btn" onClick={() => c.resolve(false)}>
+            Cancel
+          </button>
+          <button className="btn primary" onClick={() => c.resolve(true)} autoFocus>
+            {c.okLabel}
+          </button>
+        </>
+      }
+    >
+      <div>{c.message}</div>
+    </Modal>
+  );
+}
+
 export function ContextMenu() {
   const menu = useStore((s) => s.contextMenu);
   const sel = useStore((s) => s.selection);

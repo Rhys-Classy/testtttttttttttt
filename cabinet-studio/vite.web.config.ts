@@ -12,6 +12,8 @@ export default defineConfig({
       '@shared': resolve(__dirname, 'src/shared'),
     },
   },
+  // Relative asset URLs so the build works from any folder or host.
+  base: './',
   plugins: [react()],
   build: { outDir: resolve(__dirname, 'out/web'), emptyOutDir: true, chunkSizeWarningLimit: 4000 },
   server: { port: 5199, strictPort: true },
