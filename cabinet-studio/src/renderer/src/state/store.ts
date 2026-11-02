@@ -32,6 +32,10 @@ export interface GpuStatus {
   vendor: string;
   software: boolean;
   tier: 'low' | 'medium' | 'high';
+  /** Integrated graphics (Intel UHD/Iris etc.) is drawing the 3D view. */
+  integrated: boolean;
+  /** GPU the browser itself uses (WebGL), which can differ from the WebGPU device. */
+  displayGpu: string;
   maxTextureSize: number;
   details: Record<string, string>;
   error?: string;

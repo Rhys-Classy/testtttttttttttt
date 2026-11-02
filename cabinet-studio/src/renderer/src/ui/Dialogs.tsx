@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Box, Camera, CheckCircle2, Copy, Cpu, FilePlus2, FileDown, FlipHorizontal2, History, Info, ListChecks, RotateCw, Square, Trash2, XCircle } from 'lucide-react';
+import { AlertTriangle, Box, Camera, CheckCircle2, Copy, Cpu, FilePlus2, FileDown, FlipHorizontal2, History, Info, ListChecks, RotateCw, Square, Trash2, XCircle } from 'lucide-react';
 import { activeRoom, newId, type LightingPreset, type RenderSettings } from '@engine/index';
 import type { GpuReport as BridgeGpuReport } from '@shared/ipc';
 import {
@@ -377,10 +377,10 @@ function GpuDialog() {
       <div className="kv">
         <div>Rendering API</div>
         <div>{engine ? (engine.backend === 'webgpu' ? 'WebGPU (native GPU)' : 'WebGL 2 (fallback)') : '—'}</div>
-        <div>Adapter</div>
+        <div>3D drawn on</div>
         <div>{gpu?.adapter ?? '—'}</div>
-        <div>Vendor</div>
-        <div>{gpu?.vendor || '—'}</div>
+        <div>Browser display GPU</div>
+        <div>{gpu?.displayGpu || '—'}</div>
         <div>Hardware acceleration</div>
         <div>{gpu ? (gpu.software ? 'Software rendering — GPU not in use' : 'Yes — local GPU') : '—'}</div>
         <div>Detected tier</div>
@@ -403,6 +403,16 @@ function GpuDialog() {
           ))}
         {report && report.switches.length > 0 && <Fragmentish k="Launch switches" v={report.switches.join(' ')} />}
       </div>
+      {gpu?.integrated && (
+        <div className="warn">
+          <AlertTriangle size={14} style={{ flex: 'none', marginTop: 1 }} />
+          <span>
+            The 3D view is running on integrated graphics. If this PC has a graphics card (NVIDIA / AMD): Windows Settings → System → Display → Graphics → choose your browser (or
+            Cabinet Studio) → Options → <b>High performance</b> → Save, then restart it. On a desktop, also make sure the monitor cable is plugged into the graphics card, not the
+            motherboard.
+          </span>
+        </div>
+      )}
       <Row label="Quality">
         <Seg value={quality} options={QUALITY_ORDER.map((q) => ({ value: q, label: q[0].toUpperCase() + q.slice(1) }))} onChange={(q) => useStore.getState().setQuality(q)} />
       </Row>

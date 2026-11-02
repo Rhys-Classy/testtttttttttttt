@@ -134,7 +134,10 @@ export class RenderEngine {
 
   async init(canvas: HTMLCanvasElement, gpu: GpuStatus, quality: QualityPreset, preferWebGL = false): Promise<void> {
     const forceWebGL = preferWebGL || gpu.backend !== 'webgpu';
-    this.renderer = new THREE.WebGPURenderer({ canvas, antialias: !gpu.software, forceWebGL, alpha: false });
+    // powerPreference reaches three's WebGPU backend: on dual-GPU PCs this asks for the
+    // dedicated graphics card instead of the integrated chip.
+    const opts = { canvas, antialias: !gpu.software, forceWebGL, alpha: false, powerPreference: 'high-performance' };
+    this.renderer = new THREE.WebGPURenderer(opts as ConstructorParameters<typeof THREE.WebGPURenderer>[0]);
     // A lost GPU device (driver reset, GPU removed, out of memory) is reported to the app,
     // which rebuilds the viewport on the WebGL 2 backend.
     (this.renderer as unknown as { onDeviceLost: (info: { message?: string }) => void }).onDeviceLost = (info) => {

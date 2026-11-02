@@ -29,6 +29,8 @@ let keepAlive: MinimalAdapter | null = null;
 
 const SOFTWARE = /swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/i;
 const HIGH = /nvidia|geforce|rtx|gtx|quadro|radeon|amd|apple m\d|apple gpu|arc /i;
+const INTEGRATED = /intel|uhd|iris|hd graphics|vega \d|radeon\(tm\) graphics/i;
+const VENDOR_NAMES: Record<string, string> = { nvidia: 'NVIDIA', intel: 'Intel', amd: 'AMD', apple: 'Apple', qualcomm: 'Qualcomm', arm: 'Arm' };
 
 function webglInfo(): { ok: boolean; renderer: string; vendor: string; maxTexture: number } {
   try {
@@ -62,19 +64,24 @@ export async function detectGpu(): Promise<GpuStatus> {
         keepAlive = adapter;
         void keepAlive;
         const info = adapter.info ?? {};
-        const name = [info.vendor, info.architecture, info.device, info.description].filter(Boolean).join(' · ') || 'WebGPU adapter';
+        const vendor = info.vendor ? (VENDOR_NAMES[info.vendor.toLowerCase()] ?? info.vendor) : '';
+        const name = [vendor, info.description || info.device, info.architecture ? `(${info.architecture})` : ''].filter(Boolean).join(' ') || 'WebGPU adapter';
         const fallback = !!(adapter.isFallbackAdapter ?? info.isFallbackAdapter);
         const software = fallback || SOFTWARE.test(`${name} ${gl.renderer}`);
         details['WebGPU adapter'] = name;
         details['Fallback adapter'] = fallback ? 'yes' : 'no';
         details['Max texture'] = String(adapter.limits.maxTextureDimension2D);
         details['Timestamp queries'] = adapter.features.has('timestamp-query') ? 'yes' : 'no';
+        // Judge the device WebGPU actually gave us, not the browser's display GPU.
+        const integrated = !software && INTEGRATED.test(`${info.vendor ?? ''} ${name}`) && !HIGH.test(name);
         return {
           backend: 'webgpu',
-          adapter: gl.renderer || name,
-          vendor: info.vendor ?? gl.vendor,
+          adapter: name,
+          vendor,
           software,
-          tier: software ? 'low' : HIGH.test(`${name} ${gl.renderer}`) ? 'high' : 'medium',
+          integrated,
+          displayGpu: gl.renderer,
+          tier: software ? 'low' : integrated ? 'medium' : HIGH.test(name) ? 'high' : 'medium',
           maxTextureSize: adapter.limits.maxTextureDimension2D,
           details,
         };
@@ -93,10 +100,12 @@ export async function detectGpu(): Promise<GpuStatus> {
       adapter: gl.renderer,
       vendor: gl.vendor,
       software,
+      integrated: !software && INTEGRATED.test(gl.renderer) && !HIGH.test(gl.renderer),
+      displayGpu: gl.renderer,
       tier: software ? 'low' : HIGH.test(gl.renderer) ? 'high' : 'medium',
       maxTextureSize: gl.maxTexture,
       details,
     };
   }
-  return { backend: 'none', adapter: 'none', vendor: '', software: true, tier: 'low', maxTextureSize: 0, details, error: 'No GPU graphics API is available.' };
+  return { backend: 'none', adapter: 'none', vendor: '', software: true, integrated: false, displayGpu: '', tier: 'low', maxTextureSize: 0, details, error: 'No GPU graphics API is available.' };
 }
