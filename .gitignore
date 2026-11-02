@@ -11,3 +11,7 @@ coverage/
 next-env.d.ts
 tsconfig.tsbuildinfo
 .netlify/
+
+# Cabinet Studio desktop app
+cabinet-studio/release/
+cabinet-studio/*.tsbuildinfo
