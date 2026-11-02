@@ -5,9 +5,11 @@
 // bottom, back, shelves, doors, drawer fronts and drawer boxes — from the rules, so the
 // 3D model, drawings and cutlist can never disagree.
 
-import { HANDLE_LENGTHS, HARDWARE } from '../library/hardware';
+import { HARDWARE } from '../library/hardware';
+import { handleHardwareId, handleVisual, planFront } from './fronts';
+import { buildCornerCabinet } from './build-corner';
 import { clamp, clean } from '../math/vec';
-import type { CabinetCategory, CabinetItem, ConstructionRules, FrontSection, Id, MaterialDef, MaterialSlot } from '../model/types';
+import type { CabinetCategory, CabinetItem, ConstructionRules, FrontSection, HandleStyle, Id, MaterialDef, MaterialSlot } from '../model/types';
 import {
   box,
   makePart,
@@ -117,6 +119,7 @@ export function buildCabinet(cab: CabinetItem, ctx: BuildContext): ItemBuild {
   const bounds = box(0, overlay ? -ft : 0, 0, W, overlay ? D + ft : D, H);
   const warnings: string[] = [];
 
+  if (p.corner) return buildCornerCabinet(cab, ctx);
   const problems = validateCabinet(cab, r);
   if (problems.length) {
     return { itemId: cab.id, parts: [], hardware: [], appliances: [], warnings: problems, invalid: true, bounds };
@@ -307,6 +310,9 @@ export function buildCabinet(cab: CabinetItem, ctx: BuildContext): ItemBuild {
       lengthAxis: 'z',
       edges: allEdges('y', fb),
       comment: `Fixed — ${p.blind.side} blind corner`,
+      frontKey: 'blind',
+      facing: 'y-',
+      materialId: cab.frontOverrides?.blind?.materialId,
     });
   }
 
@@ -392,33 +398,12 @@ export function buildCabinet(cab: CabinetItem, ctx: BuildContext): ItemBuild {
     }
   }
 
-  const handleStyle = p.handle;
-  const addHandle = (partKey: string, pb: PartBox, orientation: 'door' | 'drawer', hinge?: 'left' | 'right'): void => {
-    if (handleStyle === 'none') return;
-    const len = HANDLE_LENGTHS[handleStyle] ?? 160;
-    let cx: number;
-    let cz: number;
-    let axis: Axis;
-    if (orientation === 'drawer') {
-      axis = 'x';
-      cx = pb.x + pb.sx / 2;
-      cz = pb.sz < 220 ? pb.z + pb.sz / 2 : pb.z + pb.sz - 50;
-    } else {
-      axis = 'z';
-      cx = hinge === 'left' ? pb.x + pb.sx - 40 : pb.x + 40;
-      const half = len / 2 + 40;
-      const zMin = pb.z + half;
-      const zMax = pb.z + pb.sz - half;
-      const target = cab.category === 'wall' ? zMin : benchCab ? zMax : 1050;
-      cz = zMax < zMin ? pb.z + pb.sz / 2 : clamp(target, zMin, zMax);
-    }
-    addHw({
-      key: `${partKey}-handle`,
-      hardwareId: handleStyle === 'knob' ? 'handle-knob' : `handle-${handleStyle}`,
-      qty: 1,
-      partKey,
-      visual: { kind: handleStyle === 'knob' ? 'knob' : 'bar', center: { x: cx, y: pb.y - 14, z: cz }, axis, length: len },
-    });
+  const zRule: 'top' | 'bottom' | number = cab.category === 'wall' ? 'bottom' : benchCab ? 'top' : 1050;
+  const pullEdge: 'top' | 'bottom' = cab.category === 'wall' ? 'bottom' : 'top';
+  const addHandle = (partKey: string, pb: PartBox, orientation: 'door' | 'drawer', style: HandleStyle, hinge?: 'left' | 'right'): void => {
+    const visual = handleVisual(style, pb, 'y-', orientation, hinge, zRule);
+    if (!visual) return;
+    addHw({ key: `${partKey}-handle`, hardwareId: handleHardwareId(style), qty: 1, partKey, visual });
   };
 
   const addShelves = (i: number, lo: number, hi: number, count: number): void => {
@@ -479,30 +464,37 @@ export function buildCabinet(cab: CabinetItem, ctx: BuildContext): ItemBuild {
       if (dw < 100) warnings.push(`Doors are only ${fmt(dw)} mm wide.`);
       for (let j = 0; j < count; j++) {
         const x0 = fx0 + j * (dw + gap);
-        const hinge = count === 1 ? (s.hinge ?? p.hingeSide) : j === 0 ? 'left' : 'right';
         const key = `door-${i}-${j}`;
+        const plan = planFront(cab, `${s.id}:${j}`, box(x0, fy0, L.zBot, dw, ft, L.h), 'y-', count === 1 ? (s.hinge ?? p.hingeSide) : j === 0 ? 'left' : 'right', pullEdge);
+        const hinge = plan.hinge ?? 'left';
         const door = add({
           key,
           role: 'door',
           name: `Door (${hinge === 'left' ? 'L' : 'R'})`,
           slot: 'front',
-          box: box(x0, fy0, L.zBot, dw, ft, L.h),
+          box: plan.box,
           thicknessAxis: 'y',
           lengthAxis: 'z',
           edges: allEdges('y', fb),
           hinge,
+          frontKey: plan.frontKey,
+          frontProfile: plan.profile,
+          facing: 'y-',
+          pullEdge: plan.pullEdge,
+          materialId: plan.materialId,
+          comment: plan.comment,
         });
-        const hc = hingeCount(r, L.h);
+        const hc = hingeCount(r, plan.box.sz);
         addHw({
           key: `${key}-hinges`,
           hardwareId: overlay ? 'hinge-110-softclose' : 'hinge-110-inset',
           qty: hc,
           partKey: key,
-          positions: hingePositions(L.h, hc, r.hingeEdgeOffset),
+          positions: hingePositions(plan.box.sz, hc, r.hingeEdgeOffset),
           detail: `${hinge} hand`,
         });
         addHw({ key: `${key}-plates`, hardwareId: 'hinge-plate-0', qty: hc, partKey: key });
-        addHandle(key, door.box, 'door', hinge);
+        addHandle(key, door.box, 'door', plan.handle, hinge);
       }
       addInterior(L, lo, hi);
     } else if (s.kind === 'open') {
@@ -512,17 +504,24 @@ export function buildCabinet(cab: CabinetItem, ctx: BuildContext): ItemBuild {
     } else {
       drawerNo++;
       const key = `drawer-${i}`;
+      const plan = planFront(cab, s.id, box(fx0, fy0, L.zBot, zoneW, ft, L.h), 'y-', undefined, 'top');
       const front = add({
         key,
         role: 'drawer-front',
         name: 'Drawer Front',
         slot: 'front',
-        box: box(fx0, fy0, L.zBot, zoneW, ft, L.h),
+        box: plan.box,
         thicknessAxis: 'y',
         lengthAxis: 'z',
         edges: allEdges('y', fb),
+        frontKey: plan.frontKey,
+        frontProfile: plan.profile,
+        facing: 'y-',
+        pullEdge: plan.pullEdge,
+        materialId: plan.materialId,
+        comment: plan.comment,
       });
-      addHandle(key, front.box, 'drawer');
+      addHandle(key, front.box, 'drawer', plan.handle);
 
       const tbx = r.drawerBoxThickness;
       const boxW = Wi - 2 * r.runnerSideClearance;

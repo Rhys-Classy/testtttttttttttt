@@ -22,8 +22,9 @@ import type { AutosaveRecord } from '@shared/ipc';
 
 export type ViewMode = 'plan' | 'front' | 'side' | '3d' | 'walk';
 export type Tool = 'select' | 'wall' | 'measure';
-export type Selection = { kind: 'item' | 'wall' | 'opening'; id: string } | null;
-export type DialogKind = null | 'new-project' | 'room' | 'cutlist' | 'render' | 'recovery' | 'gpu' | 'about';
+/** `front` sub-selects one door / drawer front of the selected cabinet (its front key). */
+export type Selection = { kind: 'item' | 'wall' | 'opening'; id: string; front?: string } | null;
+export type DialogKind = null | 'new-project' | 'room' | 'cutlist' | 'drawings' | 'render' | 'recovery' | 'gpu' | 'about';
 
 export interface GpuStatus {
   backend: 'webgpu' | 'webgl2' | 'none';

@@ -66,11 +66,13 @@ export const CABINET_TEMPLATES: CabinetTemplate[] = [
   { id: 'base-bin', name: 'Bin pull-out', group: 'Base', category: 'base', description: 'Single full-height drawer front for a bin system.', elevation: 0, params: { ...COMMON, ...BASE, width: 450, fronts: [drawer()] } },
   { id: 'base-oven', name: 'Under-bench oven', group: 'Base', category: 'base', description: 'Oven opening over a 120 mm drawer.', elevation: 0, params: { ...COMMON, ...BASE, width: 600, fronts: [appliance('Oven', null), drawer(120)] } },
   { id: 'base-blind-corner', name: 'Blind corner base', group: 'Base', category: 'base', description: 'Door with a 450 mm blind panel for an L corner.', elevation: 0, params: { ...COMMON, ...BASE, width: 1000, fronts: [doors(1, 1)], hingeSide: 'right', blind: { side: 'left', width: 450 } } },
+  { id: 'base-corner-l', name: 'Corner base (L-shape)', group: 'Base', category: 'base', description: 'L-shaped corner, 900 × 900, bi-fold doors, one L shelf.', elevation: 0, params: { ...COMMON, ...BASE, width: 900, fronts: [doors(1)], corner: { side: 'left', returnWidth: 900, doors: 'bifold' } } },
   { id: 'base-open', name: 'Open base', group: 'Base', category: 'base', description: 'Open shelving, no fronts.', elevation: 0, params: { ...COMMON, ...BASE, width: 600, fronts: [open(1)] } },
 
   // Wall
   { id: 'wall-1-door', name: 'Wall 1 door', group: 'Wall', category: 'wall', description: 'Single door, two shelves.', elevation: 1350, params: { ...COMMON, ...WALL, width: 450, fronts: [doors(2)] } },
   { id: 'wall-2-door', name: 'Wall 2 door', group: 'Wall', category: 'wall', description: 'Pair of doors, two shelves.', elevation: 1350, params: { ...COMMON, ...WALL, width: 900, fronts: [doors(2)] } },
+  { id: 'wall-corner-l', name: 'Corner wall (L-shape)', group: 'Wall', category: 'wall', description: 'L-shaped wall corner, 600 × 600, bi-fold doors, two L shelves.', elevation: 1350, params: { ...COMMON, ...WALL, width: 600, fronts: [doors(2)], corner: { side: 'left', returnWidth: 600, doors: 'bifold' } } },
   { id: 'wall-open', name: 'Open wall shelf', group: 'Wall', category: 'wall', description: 'Open wall unit with one shelf.', elevation: 1350, params: { ...COMMON, ...WALL, width: 600, fronts: [open(1)] } },
   { id: 'wall-over-fridge', name: 'Over-fridge cabinet', group: 'Wall', category: 'wall', description: 'Full-depth pair of doors above a fridge.', elevation: 1650, params: { ...COMMON, height: 450, depth: 580, kickHeight: 0, width: 900, fronts: [doors(0, 2)] } },
   { id: 'wall-rangehood', name: 'Rangehood cabinet', group: 'Wall', category: 'wall', description: 'Wall cabinet with no shelves for an undermount rangehood.', elevation: 1350, params: { ...COMMON, ...WALL, width: 600, fronts: [doors(0)] } },
@@ -114,7 +116,7 @@ export function sectionsFrom(defs: SectionDef[]): FrontSection[] {
 }
 
 export function cabinetFromTemplate(t: CabinetTemplate, label: string): CabinetItem {
-  const { fronts, ends, blind, ...rest } = t.params;
+  const { fronts, ends, blind, corner, ...rest } = t.params;
   return {
     kind: 'cabinet',
     id: newId('cab'),
@@ -124,7 +126,7 @@ export function cabinetFromTemplate(t: CabinetTemplate, label: string): CabinetI
     category: t.category,
     placement: { x: 0, y: 0, rotation: 0, elevation: t.elevation },
     wallId: null,
-    params: { ...rest, ends: { ...ends }, blind: blind ? { ...blind } : null, fronts: sectionsFrom(fronts) },
+    params: { ...rest, ends: { ...ends }, blind: blind ? { ...blind } : null, corner: corner ? { ...corner } : null, fronts: sectionsFrom(fronts) },
   };
 }
 

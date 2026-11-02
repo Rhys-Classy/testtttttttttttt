@@ -7,7 +7,7 @@
 // thirty parts costs ~3 draw calls; geometry is rebuilt only when that item changes.
 
 import * as THREE from 'three/webgpu';
-import type { Axis, HardwareVisual, Id, ItemBuild, MaterialDef, Opening, Part, PartBox, Placement, Vec2, WallGeometry, WallPiece } from '@engine/index';
+import { planeAxes, type Axis, type HardwareVisual, type Id, type ItemBuild, type MaterialDef, type Opening, type Part, type PartBox, type Placement, type Vec2, type WallGeometry, type WallPiece } from '@engine/index';
 import type { MaterialCache } from './materials3d';
 
 export const S = 0.001;
@@ -85,29 +85,13 @@ function toGeometry(a: Arrays): THREE.BufferGeometry {
   return g;
 }
 
-function boxEdges(boxes: PartBox[]): THREE.BufferGeometry {
-  const pts: number[] = [];
-  for (const b of boxes) {
-    const x = [b.x * S, (b.x + b.sx) * S];
-    const y = [b.z * S, (b.z + b.sz) * S];
-    const z = [-(b.y + b.sy) * S, -b.y * S];
-    const c = (i: number, j: number, k: number) => [x[i], y[j], z[k]];
-    const e: [number[], number[]][] = [
-      [c(0, 0, 0), c(1, 0, 0)], [c(0, 1, 0), c(1, 1, 0)], [c(0, 0, 1), c(1, 0, 1)], [c(0, 1, 1), c(1, 1, 1)],
-      [c(0, 0, 0), c(0, 1, 0)], [c(1, 0, 0), c(1, 1, 0)], [c(0, 0, 1), c(0, 1, 1)], [c(1, 0, 1), c(1, 1, 1)],
-      [c(0, 0, 0), c(0, 0, 1)], [c(1, 0, 0), c(1, 0, 1)], [c(0, 1, 0), c(0, 1, 1)], [c(1, 1, 0), c(1, 1, 1)],
-    ];
-    for (const [p, q] of e) pts.push(...p, ...q);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-  return g;
-}
-
 export interface PickInfo {
   kind: 'item' | 'wall' | 'opening' | 'handle';
   id: Id;
   handle?: 'width-left' | 'width-right' | 'height';
+  /** Item picks: the part under the pointer and, for fronts, its front key. */
+  partKey?: string;
+  frontKey?: string;
 }
 
 export interface ItemObject {
@@ -117,21 +101,210 @@ export interface ItemObject {
   dispose: () => void;
 }
 
+type V3 = [number, number, number];
+const AXI: Record<Axis, number> = { x: 0, y: 1, z: 2 };
+/** Engine-local point (mm, Z-up) → three-local (m, Y-up). */
+const tp = (e: V3): V3 => [e[0] * S, e[2] * S, -e[1] * S];
+/** Engine direction → three direction. */
+const td = (e: V3): V3 => [e[0], e[2], -e[1]];
+const sub3 = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const cross3 = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const dot3 = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+/** Triangle with an intended outward normal; winding is fixed to match it. */
+function pushTri(a: Arrays, p: V3[], uv: [number, number][], n: V3): void {
+  let [A, B, C] = p;
+  let [ua, ub, uc] = uv;
+  if (dot3(cross3(sub3(B, A), sub3(C, A)), n) < 0) {
+    [B, C] = [C, B];
+    [ub, uc] = [uc, ub];
+  }
+  const base = a.pos.length / 3;
+  for (const [v, t] of [
+    [A, ua],
+    [B, ub],
+    [C, uc],
+  ] as const) {
+    a.pos.push(v[0], v[1], v[2]);
+    a.nrm.push(n[0], n[1], n[2]);
+    a.uv.push(t[0], t[1]);
+  }
+  a.idx.push(base, base + 1, base + 2);
+}
+
+const boxMin = (b: PartBox, ax: Axis) => (ax === 'x' ? b.x : ax === 'y' ? b.y : b.z);
+const boxSize = (b: PartBox, ax: Axis) => (ax === 'x' ? b.sx : ax === 'y' ? b.sy : b.sz);
+
+/** Extrude a shaped part's outline through its thickness. */
+function appendProfile(a: Arrays, p: Part): void {
+  const [pa, pb] = planeAxes(p.thicknessAxis);
+  const ta = p.thicknessAxis;
+  const pts = p.profile!.points;
+  const t0 = boxMin(p.box, ta);
+  const t1 = t0 + boxSize(p.box, ta);
+  const P = (u: number, v: number, w: number): V3 => {
+    const e: V3 = [0, 0, 0];
+    e[AXI[pa]] = u;
+    e[AXI[pb]] = v;
+    e[AXI[ta]] = w;
+    return tp(e);
+  };
+  const grainA = p.lengthAxis === pa;
+  const capUv = (q: Vec2): [number, number] => (grainA ? [q.y * S, q.x * S] : [q.x * S, q.y * S]);
+  const tris = THREE.ShapeUtils.triangulateShape(
+    pts.map((q) => new THREE.Vector2(q.x, q.y)),
+    [],
+  );
+  for (const [w, sign] of [
+    [t1, 1],
+    [t0, -1],
+  ] as const) {
+    const ne: V3 = [0, 0, 0];
+    ne[AXI[ta]] = sign;
+    const n = td(ne);
+    for (const tri of tris) pushTri(a, tri.map((i) => P(pts[i].x, pts[i].y, w)), tri.map((i) => capUv(pts[i])), n);
+  }
+  let along = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const q0 = pts[i];
+    const q1 = pts[(i + 1) % pts.length];
+    const dx = q1.x - q0.x;
+    const dy = q1.y - q0.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-6) continue;
+    const ne: V3 = [0, 0, 0];
+    ne[AXI[pa]] = dy / len;
+    ne[AXI[pb]] = -dx / len;
+    const n = td(ne);
+    const A = P(q0.x, q0.y, t0);
+    const B = P(q1.x, q1.y, t0);
+    const C = P(q1.x, q1.y, t1);
+    const D = P(q0.x, q0.y, t1);
+    const u0 = along * S;
+    const u1 = (along + len) * S;
+    pushTri(a, [A, B, C], [[u0, 0], [u1, 0], [u1, (t1 - t0) * S]], n);
+    pushTri(a, [A, C, D], [[u0, 0], [u1, (t1 - t0) * S], [u0, (t1 - t0) * S]], n);
+    along += len;
+  }
+}
+
+function profileEdgeSegments(p: Part, out: number[]): void {
+  const [pa, pb] = planeAxes(p.thicknessAxis);
+  const ta = p.thicknessAxis;
+  const pts = p.profile!.points;
+  const t0 = boxMin(p.box, ta);
+  const t1 = t0 + boxSize(p.box, ta);
+  const P = (q: Vec2, w: number): V3 => {
+    const e: V3 = [0, 0, 0];
+    e[AXI[pa]] = q.x;
+    e[AXI[pb]] = q.y;
+    e[AXI[ta]] = w;
+    return tp(e);
+  };
+  for (let i = 0; i < pts.length; i++) {
+    const q0 = pts[i];
+    const q1 = pts[(i + 1) % pts.length];
+    for (const w of [t0, t1]) out.push(...P(q0, w), ...P(q1, w));
+    out.push(...P(q0, t0), ...P(q0, t1));
+  }
+}
+
+function boxEdgeSegments(b: PartBox, out: number[]): void {
+  const x = [b.x * S, (b.x + b.sx) * S];
+  const y = [b.z * S, (b.z + b.sz) * S];
+  const z = [-(b.y + b.sy) * S, -b.y * S];
+  const c = (i: number, j: number, k: number) => [x[i], y[j], z[k]];
+  const e: [number[], number[]][] = [
+    [c(0, 0, 0), c(1, 0, 0)], [c(0, 1, 0), c(1, 1, 0)], [c(0, 0, 1), c(1, 0, 1)], [c(0, 1, 1), c(1, 1, 1)],
+    [c(0, 0, 0), c(0, 1, 0)], [c(1, 0, 0), c(1, 1, 0)], [c(0, 0, 1), c(0, 1, 1)], [c(1, 0, 1), c(1, 1, 1)],
+    [c(0, 0, 0), c(0, 0, 1)], [c(1, 0, 0), c(1, 0, 1)], [c(0, 1, 0), c(0, 1, 1)], [c(1, 1, 0), c(1, 1, 1)],
+  ];
+  for (const [p, q] of e) out.push(...p, ...q);
+}
+
+function boxEdges(boxes: PartBox[]): THREE.BufferGeometry {
+  const pts: number[] = [];
+  for (const b of boxes) boxEdgeSegments(b, pts);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  return g;
+}
+
+/**
+ * Visual decomposition of a profiled front into solid boxes (appearance only — the
+ * cutlist keeps one part and the machining note). Works for any facing direction.
+ */
+export function frontBoxes(p: Part): PartBox[] {
+  const prof = p.frontProfile;
+  if (!prof || prof === 'slab' || (p.role !== 'door' && p.role !== 'drawer-front')) return [p.box];
+  const f = p.facing ?? 'y-';
+  const b = p.box;
+  const T = f === 'y-' ? b.sy : b.sx;
+  const sw = f === 'y-' ? b.sx : b.sy;
+  const sh = b.sz;
+  const out: PartBox[] = [];
+  // w across the face (viewer's left → right), h up, d from the visible face backwards.
+  const mk = (w0: number, w1: number, h0: number, h1: number, d0: number, d1: number) => {
+    if (w1 - w0 <= 0.01 || h1 - h0 <= 0.01 || d1 - d0 <= 0.01) return;
+    if (f === 'y-') out.push({ x: b.x + w0, sx: w1 - w0, y: b.y + d0, sy: d1 - d0, z: b.z + h0, sz: h1 - h0 });
+    else if (f === 'x+') out.push({ x: b.x + b.sx - d1, sx: d1 - d0, y: b.y + w0, sy: w1 - w0, z: b.z + h0, sz: h1 - h0 });
+    else out.push({ x: b.x + d0, sx: d1 - d0, y: b.y + b.sy - w1, sy: w1 - w0, z: b.z + h0, sz: h1 - h0 });
+  };
+  if (prof === 'shaker') {
+    const fw = Math.min(70, 0.22 * Math.min(sw, sh));
+    const pd = Math.min(6, T / 3);
+    mk(0, sw, 0, sh, pd, T);
+    mk(0, fw, 0, sh, 0, pd);
+    mk(sw - fw, sw, 0, sh, 0, pd);
+    mk(fw, sw - fw, 0, fw, 0, pd);
+    mk(fw, sw - fw, sh - fw, sh, 0, pd);
+  } else if (prof === 'v-groove') {
+    const g = 3;
+    const pitch = 80;
+    mk(0, sw, 0, sh, g, T);
+    let w = 0;
+    for (let c = pitch; c < sw - pitch / 3; c += pitch) {
+      mk(w, c - g / 2, 0, sh, 0, g);
+      w = c + g / 2;
+    }
+    mk(w, sw, 0, sh, 0, g);
+  } else if (prof === 'j-pull') {
+    const lip = Math.min(28, sh / 4);
+    const rec = Math.min(12, T * 0.66);
+    if (p.pullEdge === 'bottom') {
+      mk(0, sw, lip, sh, 0, T);
+      mk(0, sw, 0, lip, rec, T);
+    } else {
+      mk(0, sw, 0, sh - lip, 0, T);
+      mk(0, sw, sh - lip, sh, rec, T);
+    }
+  }
+  return out.length ? out : [p.box];
+}
+
 function hardwareBoxes(v: HardwareVisual): PartBox[] {
   const c = v.center;
-  if (v.kind === 'knob') return [{ x: c.x - 14, y: c.y - 8, z: c.z - 14, sx: 28, sy: 22, sz: 28 }];
   if (v.kind === 'tube') return [{ x: c.x - v.length / 2, y: c.y - 8, z: c.z - 15, sx: v.length, sy: 16, sz: 30 }];
-  // Bar handle: grip 12 × 12 at 28 mm stand-off plus two posts at the hole centres.
+  const f = v.facing ?? 'y-';
+  const wc = f === 'y-' ? c.x : c.y;
+  // d = outward distance from the handle's reference plane (posts −14…8, grip 8…20).
+  const mk = (d0: number, d1: number, w: [number, number], z: [number, number]): PartBox => {
+    if (f === 'y-') return { x: w[0], sx: w[1] - w[0], y: c.y - d1, sy: d1 - d0, z: z[0], sz: z[1] - z[0] };
+    if (f === 'x+') return { x: c.x + d0, sx: d1 - d0, y: w[0], sy: w[1] - w[0], z: z[0], sz: z[1] - z[0] };
+    return { x: c.x - d1, sx: d1 - d0, y: w[0], sy: w[1] - w[0], z: z[0], sz: z[1] - z[0] };
+  };
+  const r = (m: number, h: number): [number, number] => [m - h, m + h];
+  if (v.kind === 'knob') return [mk(-14, 8, r(wc, 14), r(c.z, 14))];
   const grip = v.length + 40;
-  const boxes: PartBox[] = [];
-  if (v.axis === 'x') {
-    boxes.push({ x: c.x - grip / 2, y: c.y - 20, z: c.z - 6, sx: grip, sy: 12, sz: 12 });
-    for (const dx of [-v.length / 2, v.length / 2]) boxes.push({ x: c.x + dx - 5, y: c.y - 8, z: c.z - 5, sx: 10, sy: 22, sz: 10 });
-  } else {
-    boxes.push({ x: c.x - 6, y: c.y - 20, z: c.z - grip / 2, sx: 12, sy: 12, sz: grip });
-    for (const dz of [-v.length / 2, v.length / 2]) boxes.push({ x: c.x - 5, y: c.y - 8, z: c.z + dz - 5, sx: 10, sy: 22, sz: 10 });
-  }
-  return boxes;
+  if (v.axis !== 'z') return [mk(8, 20, r(wc, grip / 2), r(c.z, 6)), ...[-v.length / 2, v.length / 2].map((d) => mk(-14, 8, r(wc + d, 5), r(c.z, 5)))];
+  return [mk(8, 20, r(wc, 6), r(c.z, grip / 2)), ...[-v.length / 2, v.length / 2].map((d) => mk(-14, 8, r(wc, 5), r(c.z + d, 5)))];
+}
+
+export interface PartRange {
+  start: number;
+  end: number;
+  partKey: string;
+  frontKey?: string;
 }
 
 export function buildItemObject(
@@ -150,11 +323,9 @@ export function buildItemObject(
   const pickables: THREE.Object3D[] = [];
 
   if (build.invalid) {
-    const g = toGeometry((() => {
-      const a = newArrays();
-      appendBox(a, build.bounds);
-      return a;
-    })());
+    const a = newArrays();
+    appendBox(a, build.bounds);
+    const g = toGeometry(a);
     geoms.push(g);
     const m = new THREE.Mesh(g, cache.invalid);
     m.userData.pick = pick;
@@ -169,15 +340,30 @@ export function buildItemObject(
     if (list) list.push(p);
     else byMat.set(p.materialId, [p]);
   }
+  const edgePts: number[] = [];
   for (const [mid, parts] of byMat) {
     const a = newArrays();
-    for (const p of parts) appendBox(a, p.box, p.lengthAxis, hash01(p.id));
+    const ranges: PartRange[] = [];
+    for (const p of parts) {
+      const start = a.idx.length / 3;
+      if (p.profile) {
+        appendProfile(a, p);
+        profileEdgeSegments(p, edgePts);
+      } else {
+        for (const b of frontBoxes(p)) {
+          appendBox(a, b, p.lengthAxis, hash01(p.id));
+          boxEdgeSegments(b, edgePts);
+        }
+      }
+      ranges.push({ start, end: a.idx.length / 3, partKey: p.key, frontKey: p.frontKey });
+    }
     const g = toGeometry(a);
     geoms.push(g);
     const mesh = new THREE.Mesh(g, cache.get(materials.get(mid)));
     mesh.castShadow = opts.shadows;
     mesh.receiveShadow = opts.shadows;
     mesh.userData.pick = pick;
+    mesh.userData.ranges = ranges;
     group.add(mesh);
     pickables.push(mesh);
   }
@@ -209,7 +395,8 @@ export function buildItemObject(
 
   let edges: THREE.LineSegments | null = null;
   if (opts.edges) {
-    const eg = boxEdges(build.parts.map((p) => p.box));
+    const eg = new THREE.BufferGeometry();
+    eg.setAttribute('position', new THREE.Float32BufferAttribute(edgePts, 3));
     geoms.push(eg);
     edges = new THREE.LineSegments(eg, cache.edge);
     edges.renderOrder = 1;
@@ -218,26 +405,30 @@ export function buildItemObject(
   return { group, edges, pickables, dispose: () => geoms.forEach((x) => x.dispose()) };
 }
 
-/** Selection outline + resize handles for the selected item. */
-export function buildSelectionObject(build: ItemBuild, placement: Placement, cache: MaterialCache): { group: THREE.Group; dispose: () => void } {
+/** Selection outline + resize handles for the selected item; a single front when `partKey` is given. */
+export function buildSelectionObject(build: ItemBuild, placement: Placement, cache: MaterialCache, partKey?: string): { group: THREE.Group; dispose: () => void } {
   const group = new THREE.Group();
   applyPlacement(group, placement);
-  const b = build.bounds;
-  const outline = new THREE.LineSegments(boxEdges([{ x: b.x - 2, y: b.y - 2, z: b.z - 2, sx: b.sx + 4, sy: b.sy + 4, sz: b.sz + 4 }]), cache.edgeSelected);
+  const part = partKey ? build.parts.find((p) => p.key === partKey) : undefined;
+  const b = part ? part.box : build.bounds;
+  const pad = part ? 3 : 2;
+  const outline = new THREE.LineSegments(boxEdges([{ x: b.x - pad, y: b.y - pad, z: b.z - pad, sx: b.sx + 2 * pad, sy: b.sy + 2 * pad, sz: b.sz + 2 * pad }]), cache.edgeSelected);
   outline.renderOrder = 10;
   group.add(outline);
   const sphere = new THREE.SphereGeometry(0.03, 20, 12);
-  const handles: [PickInfo['handle'], number, number, number][] = [
-    ['width-left', b.x - 60, b.y, b.z + b.sz / 2],
-    ['width-right', b.x + b.sx + 60, b.y, b.z + b.sz / 2],
-    ['height', b.x + b.sx / 2, b.y, b.z + b.sz + 60],
-  ];
-  for (const [h, x, y, z] of handles) {
-    const m = new THREE.Mesh(sphere, cache.handle);
-    m.position.copy(toThree(x, y, z));
-    m.renderOrder = 11;
-    m.userData.pick = { kind: 'handle', id: build.itemId, handle: h } satisfies PickInfo;
-    group.add(m);
+  if (!part) {
+    const handles: [PickInfo['handle'], number, number, number][] = [
+      ['width-left', b.x - 60, b.y, b.z + b.sz / 2],
+      ['width-right', b.x + b.sx + 60, b.y, b.z + b.sz / 2],
+      ['height', b.x + b.sx / 2, b.y, b.z + b.sz + 60],
+    ];
+    for (const [h, x, y, z] of handles) {
+      const m = new THREE.Mesh(sphere, cache.handle);
+      m.position.copy(toThree(x, y, z));
+      m.renderOrder = 11;
+      m.userData.pick = { kind: 'handle', id: build.itemId, handle: h } satisfies PickInfo;
+      group.add(m);
+    }
   }
   return {
     group,

@@ -1,86 +1,183 @@
 // Cabinet runs and automatic benchtops/splashbacks.
+//
+// Every bench-height cabinet contributes one or more straight *segments* (an L-shaped
+// corner cabinet contributes one per wing). Touching segments on the same back line
+// form a run; each run gets one benchtop. Where a corner's return wing meets the long
+// wing, the return-run top stops at the long top's front edge: a butt joint, as the
+// stone or laminate is actually made.
 
 import { overlap1D } from '../math/geometry2d';
-import { angleDiff, dot, fromAngle, perpLeft, type Vec2 } from '../math/vec';
+import { angleDiff, dot, fromAngle, normalizeAngle, perpLeft, type Vec2 } from '../math/vec';
 import { newId } from '../model/ids';
 import type { CabinetItem, PanelItem, Room } from '../model/types';
 import { hasBenchtop } from '../construction/build-cabinet';
+import { allFaces, computeWalls } from '../room/walls';
 import type { EndState } from './adjacency';
+
+export interface RunSegment {
+  cabinet: CabinetItem;
+  rotation: number;
+  /** Run frame: u along the segment, v from front to back, measured from the world origin. */
+  u0: number;
+  u1: number;
+  vFront: number;
+  vBack: number;
+  top: number;
+  bottom: number;
+  leftExposed: boolean;
+  rightExposed: boolean;
+  /** When set, the top must stop exactly here at that end (corner butt joint). */
+  topU0?: number;
+  topU1?: number;
+  /** Wing depth of the corner this end joins (splashbacks continue into the corner). */
+  joinDepth?: number;
+}
 
 export interface Run {
   rotation: number;
+  segments: RunSegment[];
   cabinets: CabinetItem[];
-  /** Run frame: u along the cabinets' x axis, v along their y axis (front → back), from the world origin. */
   uMin: number;
   uMax: number;
-  /** v of the carcass fronts and backs. */
   vFront: number;
   vBack: number;
   topZ: number;
   againstWall: boolean;
   leftExposed: boolean;
   rightExposed: boolean;
+  topU0?: number;
+  topU1?: number;
+  joinLeft?: number;
+  joinRight?: number;
 }
 
 const TOL = 2;
 
-export function computeBenchRuns(room: Room, ends: Map<string, EndState>): Run[] {
-  const cabs = room.items.filter((i): i is CabinetItem => i.kind === 'cabinet' && hasBenchtop(i.category));
-  const used = new Set<string>();
-  const runs: Run[] = [];
-  const frameVals = (c: CabinetItem) => {
-    const xAxis = fromAngle(c.placement.rotation);
-    const yAxis = perpLeft(xAxis);
-    const o: Vec2 = { x: c.placement.x, y: c.placement.y };
-    const u0 = dot(o, xAxis);
-    const v0 = dot(o, yAxis);
-    return { u0, u1: u0 + c.params.width, vF: v0, vB: v0 + c.params.depth, top: c.placement.elevation + c.params.height, xAxis, yAxis };
+/** Straight segments of a cabinet in run coordinates. `trim` = front thickness + front overhang. */
+export function segmentsOf(c: CabinetItem, ends: EndState | undefined, trim: number): RunSegment[] {
+  const p = c.params;
+  const X = fromAngle(c.placement.rotation);
+  const Y = perpLeft(X);
+  const o: Vec2 = { x: c.placement.x, y: c.placement.y };
+  const ox = dot(o, X);
+  const oy = dot(o, Y);
+  const top = c.placement.elevation + p.height;
+  const bottom = c.placement.elevation;
+  const L = ends?.left ?? true;
+  const Rt = ends?.right ?? true;
+  const corner = p.corner;
+  if (!corner) {
+    return [{ cabinet: c, rotation: c.placement.rotation, u0: ox, u1: ox + p.width, vFront: oy, vBack: oy + p.depth, top, bottom, leftExposed: L, rightExposed: Rt }];
+  }
+  const W = p.width;
+  const R = corner.returnWidth;
+  const D = p.depth;
+  const segA: RunSegment = {
+    cabinet: c,
+    rotation: c.placement.rotation,
+    u0: ox,
+    u1: ox + W,
+    vFront: oy + R - D,
+    vBack: oy + R,
+    top,
+    bottom,
+    leftExposed: corner.side === 'left' ? false : L,
+    rightExposed: corner.side === 'left' ? Rt : false,
   };
-  for (const seed of cabs) {
-    if (used.has(seed.id)) continue;
+  if (corner.side === 'left') {
+    // Return wing along the left wall: frame rotated +90°, u along local +y, v along local −x.
+    const rot = normalizeAngle(c.placement.rotation + Math.PI / 2);
+    const segB: RunSegment = {
+      cabinet: c,
+      rotation: rot,
+      u0: oy,
+      u1: oy + (R - D),
+      vFront: -ox - D,
+      vBack: -ox,
+      top,
+      bottom,
+      leftExposed: L,
+      rightExposed: false,
+      topU1: oy + R - D - trim,
+      joinDepth: D,
+    };
+    return [segA, segB];
+  }
+  // Right-hand corner: return wing along the right wall, frame rotated −90°.
+  const rot = normalizeAngle(c.placement.rotation - Math.PI / 2);
+  const segB: RunSegment = {
+    cabinet: c,
+    rotation: rot,
+    u0: -oy - (R - D),
+    u1: -oy,
+    vFront: ox + W - D,
+    vBack: ox + W,
+    top,
+    bottom,
+    leftExposed: false,
+    rightExposed: Rt,
+    topU0: -oy - (R - D) + trim,
+    joinDepth: D,
+  };
+  return [segA, segB];
+}
+
+export function computeBenchRuns(room: Room, ends: Map<string, EndState>, trim = 40): Run[] {
+  const segs = room.items
+    .filter((i): i is CabinetItem => i.kind === 'cabinet' && hasBenchtop(i.category))
+    .flatMap((c) => segmentsOf(c, ends.get(c.id), trim));
+  const faces = allFaces(computeWalls(room.walls));
+  const used = new Set<RunSegment>();
+  const runs: Run[] = [];
+  for (const seed of segs) {
+    if (used.has(seed)) continue;
     const members = [seed];
-    used.add(seed.id);
-    const sv = frameVals(seed);
+    used.add(seed);
     let grew = true;
     while (grew) {
       grew = false;
-      for (const c of cabs) {
-        if (used.has(c.id) || angleDiff(c.placement.rotation, seed.placement.rotation) > 0.01) continue;
-        const xAxis = sv.xAxis;
-        const yAxis = sv.yAxis;
-        const o = { x: c.placement.x, y: c.placement.y };
-        const cu0 = dot(o, xAxis);
-        const cu1 = cu0 + c.params.width;
-        const cvB = dot(o, yAxis) + c.params.depth;
-        const ctop = c.placement.elevation + c.params.height;
-        if (Math.abs(cvB - sv.vB) > TOL || Math.abs(ctop - sv.top) > TOL) continue;
-        const touches = members.some((m) => {
-          const mv = frameVals(m);
-          return Math.abs(mv.u1 - cu0) <= TOL || Math.abs(cu1 - mv.u0) <= TOL || overlap1D(mv.u0, mv.u1, cu0, cu1) > 0;
-        });
+      for (const s of segs) {
+        if (used.has(s) || angleDiff(s.rotation, seed.rotation) > 0.01) continue;
+        if (Math.abs(s.vBack - seed.vBack) > TOL || Math.abs(s.top - seed.top) > TOL) continue;
+        const touches = members.some((m) => Math.abs(m.u1 - s.u0) <= TOL || Math.abs(s.u1 - m.u0) <= TOL || overlap1D(m.u0, m.u1, s.u0, s.u1) > 0);
         if (touches) {
-          members.push(c);
-          used.add(c.id);
+          members.push(s);
+          used.add(s);
           grew = true;
         }
       }
     }
-    const vals = members.map(frameVals);
-    const uMin = Math.min(...vals.map((v) => v.u0));
-    const uMax = Math.max(...vals.map((v) => v.u1));
-    const leftMost = members[vals.findIndex((v) => v.u0 === uMin)];
-    const rightMost = members[vals.findIndex((v) => v.u1 === uMax)];
+    members.sort((a, b) => a.u0 - b.u0);
+    const first = members[0];
+    const last = members.reduce((a, b) => (b.u1 > a.u1 ? b : a));
+    const X = fromAngle(seed.rotation);
+    const Y = perpLeft(X);
+    const uMin = first.u0;
+    const uMax = last.u1;
+    // Against a wall when a wall face lies on the back line and covers the run.
+    const againstWall = faces.some((f) => {
+      const n = f.normal;
+      if (Math.abs(n.x + Y.x) > 0.01 || Math.abs(n.y + Y.y) > 0.01) return false;
+      if (Math.abs(dot(f.a, Y) - seed.vBack) > 3) return false;
+      const fu = [dot(f.a, X), dot(f.b, X)];
+      return overlap1D(Math.min(...fu), Math.max(...fu), uMin, uMax) > (uMax - uMin) * 0.5;
+    });
     runs.push({
-      rotation: seed.placement.rotation,
-      cabinets: members.sort((a, b) => frameVals(a).u0 - frameVals(b).u0),
+      rotation: seed.rotation,
+      segments: members,
+      cabinets: [...new Set(members.map((m) => m.cabinet))],
       uMin,
       uMax,
-      vFront: Math.min(...vals.map((v) => v.vF)),
-      vBack: sv.vB,
-      topZ: sv.top,
-      againstWall: members.some((m) => !!m.wallId),
-      leftExposed: ends.get(leftMost.id)?.left ?? true,
-      rightExposed: ends.get(rightMost.id)?.right ?? true,
+      vFront: Math.min(...members.map((m) => m.vFront)),
+      vBack: seed.vBack,
+      topZ: seed.top,
+      againstWall,
+      leftExposed: first.leftExposed,
+      rightExposed: last.rightExposed,
+      topU0: first.topU0,
+      topU1: last.topU1,
+      joinLeft: first.topU0 != null ? first.joinDepth : undefined,
+      joinRight: last.topU1 != null ? last.joinDepth : undefined,
     });
   }
   return runs;
@@ -112,13 +209,16 @@ export const DEFAULT_AUTO_TOPS: AutoTopSettings = {
 /** Generate benchtops (and splashbacks against walls) for every run of bench-height cabinets. */
 export function autoTops(room: Room, ends: Map<string, EndState>, s: AutoTopSettings, nextLabel: (prefix: string) => string): PanelItem[] {
   const out: PanelItem[] = [];
-  for (const run of computeBenchRuns(room, ends)) {
-    const xAxis = fromAngle(run.rotation);
-    const yAxis = perpLeft(xAxis);
-    const u0 = run.uMin - (run.leftExposed ? s.endOverhang : 0);
-    const u1 = run.uMax + (run.rightExposed ? s.endOverhang : 0);
-    const vF = run.vFront - s.frontThickness - s.frontOverhang;
-    const at = (u: number, v: number) => ({ x: xAxis.x * u + yAxis.x * v, y: xAxis.y * u + yAxis.y * v });
+  const trim = s.frontThickness + s.frontOverhang;
+  const above = room.items.filter((i): i is CabinetItem => i.kind === 'cabinet').flatMap((c) => segmentsOf(c, ends.get(c.id), trim));
+  for (const run of computeBenchRuns(room, ends, trim)) {
+    const X = fromAngle(run.rotation);
+    const Y = perpLeft(X);
+    const u0 = run.topU0 ?? run.uMin - (run.leftExposed ? s.endOverhang : 0);
+    const u1 = run.topU1 ?? run.uMax + (run.rightExposed ? s.endOverhang : 0);
+    const vF = run.vFront - trim;
+    if (u1 - u0 < 50) continue;
+    const at = (u: number, v: number) => ({ x: X.x * u + Y.x * v, y: X.y * u + Y.y * v });
     const o = at(u0, vF);
     out.push({
       kind: 'panel',
@@ -138,26 +238,26 @@ export function autoTops(room: Room, ends: Map<string, EndState>, s: AutoTopSett
     if (!s.splashbacks || !run.againstWall) continue;
     const base = run.topZ + s.thickness;
     // Stop under any wall cabinets on the same back line above this run.
-    let top = base + s.splashHeight;
-    for (const it of room.items) {
-      if (it.kind !== 'cabinet' || angleDiff(it.placement.rotation, run.rotation) > 0.01) continue;
-      if (it.placement.elevation < base + 100) continue;
-      const iu0 = dot({ x: it.placement.x, y: it.placement.y }, xAxis);
-      const ivB = dot({ x: it.placement.x, y: it.placement.y }, yAxis) + it.params.depth;
-      if (Math.abs(ivB - run.vBack) > TOL) continue;
-      if (overlap1D(iu0, iu0 + it.params.width, run.uMin, run.uMax) <= 0) continue;
-      top = Math.min(top, it.placement.elevation);
+    let topZ = base + s.splashHeight;
+    for (const seg of above) {
+      if (seg.bottom < base + 100 || angleDiff(seg.rotation, run.rotation) > 0.01) continue;
+      if (Math.abs(seg.vBack - run.vBack) > TOL) continue;
+      if (overlap1D(seg.u0, seg.u1, run.uMin, run.uMax) <= 0) continue;
+      topZ = Math.min(topZ, seg.bottom);
     }
-    const so = at(run.uMin, run.vBack - s.splashThickness);
+    // Into a corner, the splashback runs on to meet the long wall's splashback.
+    const su0 = run.joinLeft != null ? run.uMin - run.joinLeft + s.splashThickness : Math.max(u0, run.uMin);
+    const su1 = run.joinRight != null ? run.uMax + run.joinRight - s.splashThickness : Math.min(u1, run.uMax);
+    const so = at(su0, run.vBack - s.splashThickness);
     out.push({
       kind: 'panel',
       id: newId('pnl'),
       label: nextLabel('SB'),
       name: 'Splashback',
       panelType: 'splashback',
-      width: run.uMax - run.uMin,
+      width: su1 - su0,
       depth: s.splashThickness,
-      height: Math.max(50, top - base),
+      height: Math.max(50, topZ - base),
       materialSlot: 'splashback',
       materialId: null,
       placement: { x: so.x, y: so.y, rotation: run.rotation, elevation: base },

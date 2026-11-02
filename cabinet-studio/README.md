@@ -24,7 +24,9 @@ npm run dist       # Windows installer into release/ (run on Windows for signing
 2. **Library** tab → drag a cabinet onto a wall. It snaps to the wall, butts against neighbours, and never drops on top of another cabinet. Double-click a card to add it at the room centre.
 3. Select a cabinet → edit width/height/depth/kick (type, use arrow keys, drag the ↔ label, or drag the blue handles in the viewport). Every part rebuilds instantly.
 4. **Fronts & interior** → add drawers or door sections, set fixed or auto heights, shelves, hanging rails, appliance openings.
-5. **Auto tops** → benchtops and splashbacks for every run. **Cutlist** → exact cut sizes per material, hardware schedule, CSV export. **Render** → PNG up to 4K from your GPU.
+5. **Corners**: drag *Corner base (L-shape)* or *Corner wall (L-shape)* into a room corner; set return width, left/right and bi-fold or two doors.
+6. **One door at a time**: click a selected cabinet's door or drawer again to edit just that front — hinge, handle, style (slab, shaker, V-groove, J-pull), material, trims.
+7. **Auto tops** → benchtops and splashbacks for every run (L-shaped runs butt-join at the corner). **Drawings** → A3 PDF: floor plan + dimensioned elevation of every wall with cabinets. **Cutlist** → exact cut sizes per material, hardware schedule, CSV export. **Render** → PNG up to 4K from your GPU.
 
 ## Shortcuts
 
@@ -36,7 +38,7 @@ npm run dist       # Windows installer into release/ (run on Windows for signing
 | Arrows (Shift) | Nudge 1 mm (10 mm) | F | Frame room |
 | G / E | Grid snap / part edges | Esc | Cancel / deselect |
 | Ctrl+Z / Ctrl+Y | Undo / redo | Ctrl+S / Ctrl+O | Save / open |
-| Ctrl+L / Ctrl+R | Cutlist / render | | |
+| Ctrl+L / Ctrl+R | Cutlist / render | Ctrl+P | Drawings (PDF) |
 
 Number fields accept arithmetic: `600+18`, `(900-3)/2`.
 

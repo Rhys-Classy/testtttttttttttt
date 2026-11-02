@@ -20,6 +20,8 @@ export * from './layout/adjacency';
 export * from './layout/runs';
 export * from './layout/collision';
 export * from './manufacturing/cutlist';
+export * from './drawings/sheets';
+export * from './construction/fronts';
 export * from './document/project';
 export * from './document/commands';
 export * from './document/derive';

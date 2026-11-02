@@ -2,7 +2,7 @@
 // in a plain browser (dev:web, automated tests) they fall back to downloads, file
 // pickers and localStorage so every feature still works.
 
-import type { AutosaveRecord, CabinetStudioBridge, ExportRequest, GpuReport, MenuCommand, OpenedFile, SaveRequest, SavedFile } from '@shared/ipc';
+import type { AutosaveRecord, CabinetStudioBridge, ExportRequest, GpuReport, MenuCommand, OpenedFile, PdfRequest, SaveRequest, SavedFile } from '@shared/ipc';
 
 declare global {
   interface Window {
@@ -54,6 +54,16 @@ const browserBridge: CabinetStudioBridge = {
   async exportFile(req: ExportRequest): Promise<string | null> {
     const blob = req.encoding === 'base64' ? new Blob([b64ToBytes(req.data) as BlobPart]) : new Blob([req.data], { type: 'text/plain' });
     download(req.suggestedName, blob);
+    return req.suggestedName;
+  },
+  async printPdf(req: PdfRequest): Promise<string | null> {
+    // Browser: open the sheets and use the print dialog (Save as PDF).
+    const w = window.open('', '_blank');
+    if (!w) throw new Error('Allow pop-ups to print drawings.');
+    w.document.open();
+    w.document.write(req.html);
+    w.document.close();
+    setTimeout(() => w.print(), 300);
     return req.suggestedName;
   },
   async writeAutosave(rec: AutosaveRecord): Promise<void> {

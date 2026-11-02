@@ -1,7 +1,7 @@
-import { app, dialog, type BrowserWindow } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
-import type { AutosaveRecord, ExportRequest, OpenedFile, SaveRequest, SavedFile } from '../shared/ipc';
+import type { AutosaveRecord, ExportRequest, OpenedFile, PdfRequest, SaveRequest, SavedFile } from '../shared/ipc';
 
 const PROJECT_FILTER = { name: 'Cabinet Studio project', extensions: ['cabproj'] };
 const MAX_PROJECT_BYTES = 512 * 1024 * 1024;
@@ -46,6 +46,32 @@ export async function exportFile(win: BrowserWindow, req: ExportRequest): Promis
   if (res.canceled || !res.filePath) return null;
   await atomicWrite(res.filePath, req.encoding === 'base64' ? Buffer.from(req.data, 'base64') : req.data);
   return res.filePath;
+}
+
+/**
+ * Render drawing HTML to PDF in a hidden window with JavaScript disabled (the HTML is
+ * inline SVG only), using the page size the sheets declare (A3 landscape).
+ */
+export async function printPdf(win: BrowserWindow, req: PdfRequest): Promise<string | null> {
+  let path = req.path ?? null;
+  if (path && !path.toLowerCase().endsWith('.pdf')) throw new Error('Drawings can only be saved as .pdf files.');
+  if (!path) {
+    const res = await dialog.showSaveDialog(win, { title: 'Export drawings (PDF)', defaultPath: join(app.getPath('documents'), req.suggestedName), filters: [{ name: 'PDF', extensions: ['pdf'] }] });
+    if (res.canceled || !res.filePath) return null;
+    path = res.filePath.toLowerCase().endsWith('.pdf') ? res.filePath : `${res.filePath}.pdf`;
+  }
+  const tmp = join(app.getPath('temp'), `cabinet-studio-sheets-${process.pid}-${Date.now()}.html`);
+  await writeFile(tmp, req.html, 'utf8');
+  const printer = new BrowserWindow({ show: false, webPreferences: { javascript: false, sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  try {
+    await printer.loadFile(tmp);
+    const pdf = await printer.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true, margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    await atomicWrite(path, pdf);
+    return path;
+  } finally {
+    printer.destroy();
+    await rm(tmp, { force: true });
+  }
 }
 
 const autosavePath = () => join(app.getPath('userData'), 'autosave', 'recovery.json');

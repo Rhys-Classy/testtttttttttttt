@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type MenuItemConstructorOptions } from 'electron';
 import { join } from 'node:path';
-import { IPC, type AutosaveRecord, type ExportRequest, type MenuCommand, type SaveRequest } from '../shared/ipc';
-import { clearAutosave, exportFile, openProject, openProjectAt, readAutosave, saveProject, writeAutosave } from './files';
+import { IPC, type AutosaveRecord, type ExportRequest, type MenuCommand, type PdfRequest, type SaveRequest } from '../shared/ipc';
+import { clearAutosave, exportFile, openProject, openProjectAt, printPdf, readAutosave, saveProject, writeAutosave } from './files';
 import { appliedSwitches, configureGpu, readGpuSettings, writeGpuSettings } from './gpu';
 
 configureGpu();
@@ -27,6 +27,7 @@ function buildMenu(): void {
         { type: 'separator' },
         { label: 'Cutlist & Hardware…', accelerator: 'CmdOrCtrl+L', click: () => send('cutlist') },
         { label: 'Export Cutlist (CSV)…', click: () => send('export-cutlist') },
+        { label: 'Drawings (PDF)…', accelerator: 'CmdOrCtrl+P', click: () => send('drawings') },
         { label: 'Render Image…', accelerator: 'CmdOrCtrl+R', click: () => send('render') },
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' },
@@ -130,6 +131,7 @@ function registerIpc(): void {
   ipcMain.handle(IPC.openAt, (_e, path: string) => openProjectAt(path));
   ipcMain.handle(IPC.save, (_e, req: SaveRequest) => saveProject(w(), req));
   ipcMain.handle(IPC.export, (_e, req: ExportRequest) => exportFile(w(), req));
+  ipcMain.handle(IPC.printPdf, (_e, req: PdfRequest) => printPdf(w(), req));
   ipcMain.handle(IPC.autosaveWrite, (_e, rec: AutosaveRecord) => writeAutosave(rec));
   ipcMain.handle(IPC.autosaveRead, () => readAutosave());
   ipcMain.handle(IPC.autosaveClear, () => clearAutosave());

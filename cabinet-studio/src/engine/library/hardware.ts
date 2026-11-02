@@ -23,6 +23,7 @@ export interface HardwareDef {
 export const HARDWARE: Record<string, HardwareDef> = {
   'hinge-110-softclose': { id: 'hinge-110-softclose', type: 'hinge', name: 'Concealed hinge 110°, soft close, full overlay' },
   'hinge-110-inset': { id: 'hinge-110-inset', type: 'hinge', name: 'Concealed hinge 110°, soft close, inset' },
+  'hinge-bifold': { id: 'hinge-bifold', type: 'hinge', name: 'Bi-fold corner hinge 170° (door to door)' },
   'hinge-plate-0': { id: 'hinge-plate-0', type: 'hinge-plate', name: 'Hinge mounting plate, 0 mm' },
   'runner-ballbearing': { id: 'runner-ballbearing', type: 'runner', name: 'Ball-bearing runner pair, full extension, soft close' },
   'handle-bar-128': { id: 'handle-bar-128', type: 'handle', name: 'Bar handle 128 mm cc' },

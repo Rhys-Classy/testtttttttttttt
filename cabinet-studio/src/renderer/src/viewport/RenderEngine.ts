@@ -473,7 +473,7 @@ export class RenderEngine {
     const sel = input.selection;
     const entry = sel?.kind === 'item' ? this.items.get(sel.id) : undefined;
     const st = this.selState;
-    const key = sel ? `${sel.kind}:${sel.id}:${this.view}` : '';
+    const key = sel ? `${sel.kind}:${sel.id}:${sel.front ?? ''}:${this.view}` : '';
     if (key !== this.selectionKey || (entry?.build ?? null) !== st.build) {
       this.selectionKey = key;
       st.build = entry?.build ?? null;
@@ -481,7 +481,8 @@ export class RenderEngine {
       this.selectionDispose = null;
       this.selectionGroup.clear();
       if (entry && this.view !== 'walk') {
-        const s = buildSelectionObject(entry.build, entry.item.placement, this.materials);
+        const partKey = sel?.front ? entry.build.parts.find((p) => p.frontKey === sel.front)?.key : undefined;
+        const s = buildSelectionObject(entry.build, entry.item.placement, this.materials, partKey);
         this.selectionGroup.add(s.group);
         this.selectionDispose = s.dispose;
       }
@@ -748,7 +749,14 @@ export class RenderEngine {
     const hits = rc.intersectObjects(targets, false);
     for (const h of hits) {
       const p = h.object.userData.pick as PickInfo | undefined;
-      if (p) return p;
+      if (!p) continue;
+      const ranges = h.object.userData.ranges as { start: number; end: number; partKey: string; frontKey?: string }[] | undefined;
+      if (p.kind === 'item' && ranges && h.faceIndex != null) {
+        const fi = h.faceIndex;
+        const r = ranges.find((x) => fi >= x.start && fi < x.end);
+        if (r) return { ...p, partKey: r.partKey, frontKey: r.frontKey };
+      }
+      return p;
     }
     return null;
   }

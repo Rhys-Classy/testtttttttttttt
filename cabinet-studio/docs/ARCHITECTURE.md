@@ -93,11 +93,12 @@ cabinet-studio/
 │  ├─ engine/          pure CAD engine (no UI, no three.js)
 │  │  ├─ math/           vectors, 2D geometry, placements/frames
 │  │  ├─ model/          project document types, ids
-│  │  ├─ construction/   parts, buildCabinet, buildPanel
+│  │  ├─ construction/   parts, buildCabinet, buildCorner, fronts (overrides/styles), buildPanel
 │  │  ├─ library/        cabinet templates, construction standards, materials, hardware
 │  │  ├─ room/           walls (mitred faces, openings → wall pieces), room factory
 │  │  ├─ layout/         snapping, auto ends, runs + auto tops, clash detection, extents
 │  │  ├─ manufacturing/  cutlist, hardware schedule, CSV
+│  │  ├─ drawings/       A3 plan and elevation sheets (SVG → PDF)
 │  │  └─ document/       project factory, commands, derive cache, file format
 │  └─ renderer/
 │     ├─ index.html
@@ -202,6 +203,20 @@ banding per edge (L1/L2 long edges, W1/W2 ends), and **cut size = finished − b
 the opposite edges** (verified against the shop's own example: 580 × 870 banded on one
 long edge and both ends cuts at 579 × 868).
 
+**Corner cabinets** (`construction/build-corner.ts`): an L carcass with a long wing on the
+back wall and a return wing on the side wall; L-shaped bottom, top and shelves are
+`Part.profile` outlines (exact for CNC, bounding blank on the cutlist). Doors are a bi-fold
+pair or two hinged doors; the right-hand version is an exact mirror of the left.
+
+**Per-front overrides and styles** (`construction/fronts.ts`): every door and drawer
+front has a stable `frontKey`; `CabinetItem.frontOverrides[frontKey]` can change its hinge,
+handle, profile (slab / shaker / V-groove / J-pull), material and per-edge trim. Profiles
+are rendered as real recesses in 3D and recorded as machining notes on the part.
+
+**Drawings** (`drawings/sheets.ts`): A3 SVG sheets generated from the builds — plan and
+elevations with width chains, height chains, hinge symbols and a title block — printed to
+PDF by the main process in a script-disabled window.
+
 **Automatic behaviour**: wall snapping and face alignment, butting against neighbours,
 collision avoidance on drop, finished ends where a side is exposed (built in the front
 material, so visible ends always match the doors), runs → benchtops with overhangs only
@@ -253,14 +268,20 @@ The drawing environment adds a **sketch model** to the document:
 - [x] Material slots with project defaults and per-cabinet overrides; imported image textures; stock-thickness check
 - [x] Automatic finished ends; auto benchtops and splashbacks; clash detection
 - [ ] SQLite shop libraries (materials, hardware with prices, standards) shared across projects
-- [ ] Per-door overrides (individual door sizes/styles), door styles (shaker, profiles), finger-pull / channel handleless systems, sliding doors, lift-up and pull-out hardware
-- [ ] L-shaped and angled corner cabinets; applied end panels from rules; kickboards per run
-- [ ] Dimensioned PDF plan/elevation sheets and cabinet detail drawings; project versions (named snapshots)
+- [x] Per-front overrides: click a door/drawer of the selected cabinet to change its hinge, handle, style, material and edge trims
+- [x] Front styles: slab, shaker, V-groove, J-pull (handleless) — shown in 3D and drawings, machining noted on the cutlist
+- [x] L-shaped corner cabinets (base and wall, left/right, bi-fold pair or two doors) with shaped L bottoms, tops and shelves
+- [x] Dimensioned A3 PDF drawings: floor plan + an elevation for every wall with cabinets (width/height chains, hinge symbols, title block)
+- [ ] Sliding doors, lift-up and pull-out hardware, channel handleless systems
+- [ ] Angled (45°) corner cabinets; applied end panels from rules; kickboards per run
+- [ ] Cabinet detail drawings; project versions (named snapshots)
 
 **Phase 3 — custom drawing and custom geometry**
 
 - [ ] Sketch entities and tools (§6), object snaps, layers and groups
-- [ ] Extrude to parts; shaped benchtops (polygon union at L/U corners), curved ends, angled cabinetry; Clipper2 and manifold-3d integration
+- [x] Shaped (non-rectangular) parts end to end: outline in the model, extruded in 3D, bounding blank + outline banding on the cutlist
+- [x] L-shaped kitchens: benchtops butt-join at the corner, splashbacks continue into the corner
+- [ ] Extrude drawn profiles to parts; curved ends, angled cabinetry; Clipper2 and manifold-3d integration
 
 **Phase 4 — presentation rendering**
 
@@ -289,6 +310,6 @@ The drawing environment adds a **sketch model** to the document:
   has no GPU (its software WebGPU adapter fails, which is how the self-test/fallback was
   proven). WebGL 2 rendering is verified. First run on a real Windows PC: check
   *Help → Graphics & GPU* shows "WebGPU" and the viewport looks right.
-- Kickboards are per cabinet, benchtops at L corners overlap (no polygon union yet),
-  no L-shaped corner cabinets yet, no sheet optimisation yet.
+- Kickboards are per cabinet (not per run); no angled corner cabinets or sheet
+  optimisation yet.
 - Very large scenes still issue a few draw calls per cabinet (BatchedMesh planned).

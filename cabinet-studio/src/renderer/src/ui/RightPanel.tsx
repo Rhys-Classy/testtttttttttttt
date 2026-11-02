@@ -18,6 +18,8 @@ import {
   type ConstructionRules,
   type EndMode,
   type FrontKind,
+  type FrontOverride,
+  type FrontProfile,
   type FrontSection,
   type HandleStyle,
   type Item,
@@ -90,6 +92,124 @@ function PlacementFields({ item }: { item: Item }) {
         </button>
         <button className="btn small" onClick={duplicateSelection}>
           <Copy size={13} /> Copy
+        </button>
+      </div>
+    </Section>
+  );
+}
+
+const PROFILES: { value: FrontProfile; label: string }[] = [
+  { value: 'slab', label: 'Slab' },
+  { value: 'shaker', label: 'Shaker' },
+  { value: 'v-groove', label: 'V-groove' },
+  { value: 'j-pull', label: 'J-pull (handleless)' },
+];
+
+const HANDLES: { value: HandleStyle; label: string }[] = [
+  { value: 'bar-128', label: 'Bar 128 mm' },
+  { value: 'bar-160', label: 'Bar 160 mm' },
+  { value: 'bar-192', label: 'Bar 192 mm' },
+  { value: 'bar-320', label: 'Bar 320 mm' },
+  { value: 'knob', label: 'Knob' },
+  { value: 'none', label: 'Handleless' },
+];
+
+function CornerFields({ cab }: { cab: CabinetItem }) {
+  const c = cab.params.corner!;
+  const set = (patch: Partial<NonNullable<CabinetItem['params']['corner']>>, live = false) => cabParam(cab.id, 'corner', live)({ ...c, ...patch });
+  return (
+    <>
+      <div className="row2">
+        <label className="stack-label">
+          <span>Return width</span>
+          <NumberField value={c.returnWidth} min={300} max={2400} scrubLabel="↔" onCommit={(v) => set({ returnWidth: v })} onPreview={(v) => set({ returnWidth: v }, true)} onScrubEnd={end} />
+        </label>
+        <label className="stack-label">
+          <span>Corner</span>
+          <Seg value={c.side} options={[{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }]} onChange={(side) => set({ side })} />
+        </label>
+      </div>
+      <Row label="Doors">
+        <Seg value={c.doors} options={[{ value: 'bifold', label: 'Bi-fold pair' }, { value: 'separate', label: 'Two doors' }]} onChange={(doors) => set({ doors })} />
+      </Row>
+    </>
+  );
+}
+
+function FrontEditor({ cab, build, frontKey }: { cab: CabinetItem; build: ItemBuild; frontKey: string }) {
+  const doc = useStore((s) => s.doc);
+  const part = build.parts.find((p) => p.frontKey === frontKey);
+  if (!part) return null;
+  const o: FrontOverride = cab.frontOverrides?.[frontKey] ?? {};
+  const write = (next: FrontOverride) =>
+    commitItem(cab.id, (i) => {
+      if (i.kind !== 'cabinet') return i;
+      const all = { ...i.frontOverrides };
+      const cleaned = Object.fromEntries(Object.entries(next).filter(([, v]) => v !== undefined && !(typeof v === 'object' && v && Object.keys(v).length === 0))) as FrontOverride;
+      if (Object.keys(cleaned).length) all[frontKey] = cleaned;
+      else delete all[frontKey];
+      return { ...i, frontOverrides: all };
+    });
+  const setTrim = (k: 'left' | 'right' | 'top' | 'bottom', v: number) => {
+    const t = { ...o.trim, [k]: v || undefined };
+    for (const key of Object.keys(t) as (keyof typeof t)[]) if (!t[key]) delete t[key];
+    write({ ...o, trim: t });
+  };
+  const w = part.facing === 'y-' || !part.facing ? part.box.sx : part.box.sy;
+  const isDoor = part.role === 'door';
+  const front = materialsForSlot(doc.materials, 'front');
+  return (
+    <Section title={`Selected: ${part.name}`} extra={`${Math.round(w * 10) / 10} × ${Math.round(part.box.sz * 10) / 10}`}>
+      <Row label="Style">
+        <select className="select" value={o.profile ?? ''} onChange={(e) => write({ ...o, profile: (e.target.value || undefined) as FrontProfile | undefined })}>
+          <option value="">Cabinet: {PROFILES.find((p) => p.value === (cab.params.profile ?? 'slab'))?.label}</option>
+          {PROFILES.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </Row>
+      {isDoor && (
+        <Row label="Hinged on">
+          <Seg value={part.hinge ?? 'left'} options={[{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }]} onChange={(hinge) => write({ ...o, hinge })} />
+        </Row>
+      )}
+      <Row label="Handle">
+        <select className="select" value={o.handle ?? ''} onChange={(e) => write({ ...o, handle: (e.target.value || undefined) as HandleStyle | undefined })}>
+          <option value="">Cabinet: {HANDLES.find((h) => h.value === cab.params.handle)?.label}</option>
+          {HANDLES.map((h) => (
+            <option key={h.value} value={h.value}>
+              {h.label}
+            </option>
+          ))}
+        </select>
+      </Row>
+      <Row label="Material">
+        <select className="select" value={o.materialId ?? ''} onChange={(e) => write({ ...o, materialId: e.target.value || undefined })}>
+          <option value="">Cabinet fronts</option>
+          {front.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+      </Row>
+      <div className="hint">Trim: extend (+) or reduce (−) an edge, mm.</div>
+      <div className="row2">
+        {(['left', 'right', 'top', 'bottom'] as const).map((k) => (
+          <label key={k} className="stack-label">
+            <span>{k[0].toUpperCase() + k.slice(1)}</span>
+            <NumberField value={o.trim?.[k] ?? 0} min={-200} max={200} step={0.5} onCommit={(v) => setTrim(k, v)} />
+          </label>
+        ))}
+      </div>
+      <div className="row2">
+        <button className="btn small" onClick={() => write({})} disabled={!Object.keys(o).length}>
+          Reset this front
+        </button>
+        <button className="btn small" onClick={() => S().select({ kind: 'item', id: cab.id })}>
+          Back to cabinet
         </button>
       </div>
     </Section>
@@ -199,6 +319,16 @@ function FrontsEditor({ cab, build }: { cab: CabinetItem; build: ItemBuild }) {
           {fronts.filter((f) => f.kind === 'drawer').length + 1}× drawers
         </button>
       </div>
+      <Row label="Door style">
+        <select className="select" value={cab.params.profile ?? 'slab'} onChange={(e) => cabParam(cab.id, 'profile', false)(e.target.value as FrontProfile)}>
+          {PROFILES.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </Row>
+      <div className="hint">Click a door or drawer front of the selected cabinet to adjust just that one.</div>
       <div className="row2">
         <label className="stack-label">
           <span>Handles</span>
@@ -443,6 +573,7 @@ function Warnings({ build }: { build: ItemBuild }) {
 
 function CabinetProps({ cab, build }: { cab: CabinetItem; build: ItemBuild }) {
   const doc = useStore((s) => s.doc);
+  const front = useStore((s) => (s.selection?.kind === 'item' && s.selection.id === cab.id ? s.selection.front : undefined));
   const t = templateById(cab.templateId);
   return (
     <>
@@ -454,13 +585,15 @@ function CabinetProps({ cab, build }: { cab: CabinetItem; build: ItemBuild }) {
         <TextField value={cab.name} onCommit={(name) => commitItem(cab.id, (i) => ({ ...i, name }) as Item)} />
       </div>
       <Warnings build={build} />
+      {front && <FrontEditor cab={cab} build={build} frontKey={front} />}
       <Section title="Size">
         <div className="row2">
           <DimField id={cab.id} k="width" label="Width" value={cab.params.width} min={60} max={3600} />
           <DimField id={cab.id} k="height" label="Height" value={cab.params.height} min={100} max={3000} />
-          <DimField id={cab.id} k="depth" label="Depth (carcass)" value={cab.params.depth} min={100} max={1200} />
+          <DimField id={cab.id} k="depth" label={cab.params.corner ? 'Wing depth' : 'Depth (carcass)'} value={cab.params.depth} min={100} max={1200} />
           <DimField id={cab.id} k="kickHeight" label="Kick height" value={cab.params.kickHeight} min={0} max={300} />
         </div>
+        {cab.params.corner && <CornerFields cab={cab} />}
       </Section>
       <FrontsEditor cab={cab} build={build} />
       <PlacementFields item={cab} />

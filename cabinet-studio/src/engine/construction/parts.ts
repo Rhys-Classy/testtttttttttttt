@@ -2,8 +2,8 @@
 // cutlists and (later) CNC output all read the same Part records.
 
 import type { HardwareType } from '../library/hardware';
-import type { Vec3 } from '../math/vec';
-import type { HingeSide, Id, MaterialSlot } from '../model/types';
+import type { Vec2, Vec3 } from '../math/vec';
+import type { FrontProfile, HingeSide, Id, MaterialSlot } from '../model/types';
 
 export type Axis = 'x' | 'y' | 'z';
 
@@ -53,6 +53,17 @@ export interface Banding {
   w2: number;
 }
 
+/**
+ * Outline of a shaped (non-rectangular) panel, counter-clockwise, in item-local
+ * coordinates of the panel's two in-plane axes in x→y→z order (thickness z: (x, y);
+ * thickness y: (x, z); thickness x: (y, z)). `box` is its bounding box.
+ */
+export interface PartProfile {
+  points: Vec2[];
+  /** Banding thickness per outline edge (edge i runs from point i to point i+1). */
+  edgeBanding?: number[];
+}
+
 export interface Part {
   /** Unique in the project: `${itemId}:${key}`. */
   id: string;
@@ -79,6 +90,16 @@ export interface Part {
   comment?: string;
   /** Doors only. */
   hinge?: HingeSide;
+  /** Shaped panels only. Cut sizes are the bounding blank; the CNC cuts the outline. */
+  profile?: PartProfile;
+  /** Doors, drawer fronts and blind panels: stable key used for per-front overrides. */
+  frontKey?: string;
+  /** Doors and drawer fronts: profile for rendering and machining. */
+  frontProfile?: FrontProfile;
+  /** Fronts: outward direction of the visible face. */
+  facing?: 'y-' | 'x+' | 'x-';
+  /** J-pull fronts: which edge carries the routed pull. */
+  pullEdge?: 'top' | 'bottom';
 }
 
 export interface HardwareVisual {
@@ -86,6 +107,8 @@ export interface HardwareVisual {
   center: Vec3;
   axis: Axis;
   length: number;
+  /** Outward direction of the front the handle is on (default 'y-'). */
+  facing?: 'y-' | 'x+' | 'x-';
 }
 
 export interface HardwarePlacement {
@@ -139,6 +162,13 @@ export interface PartSpec {
   edges?: Partial<Record<EdgeId, number>>;
   comment?: string;
   hinge?: HingeSide;
+  profile?: PartProfile;
+  frontKey?: string;
+  frontProfile?: FrontProfile;
+  facing?: 'y-' | 'x+' | 'x-';
+  pullEdge?: 'top' | 'bottom';
+  /** Overrides the slot's material (per-front overrides). */
+  materialId?: Id;
 }
 
 export interface PartContext {
@@ -150,7 +180,7 @@ export interface PartContext {
 }
 
 export function makePart(spec: PartSpec, ctx: PartContext): Part {
-  const materialId = ctx.materialFor(spec.slot);
+  const materialId = spec.materialId ?? ctx.materialFor(spec.slot);
   const [a, b] = otherAxes(spec.thicknessAxis);
   let lengthAxis: Axis;
   if (spec.lengthAxis && ctx.hasGrain(materialId)) lengthAxis = spec.lengthAxis;
@@ -159,12 +189,16 @@ export function makePart(spec: PartSpec, ctx: PartContext): Part {
   const e = spec.edges ?? {};
   const edge = (axis: Axis, end: 0 | 1): number => e[`${axis}${end}` as EdgeId] ?? 0;
   // Long edges run along the length, so they sit at the min/max of the width axis.
-  const banding: Banding = {
-    l1: edge(widthAxis, 0),
-    l2: edge(widthAxis, 1),
-    w1: edge(lengthAxis, 0),
-    w2: edge(lengthAxis, 1),
-  };
+  // Shaped parts carry banding per outline edge; the rectangular L/W codes stay zero
+  // and the cut size is the bounding blank.
+  const banding: Banding = spec.profile
+    ? { l1: 0, l2: 0, w1: 0, w2: 0 }
+    : {
+        l1: edge(widthAxis, 0),
+        l2: edge(widthAxis, 1),
+        w1: edge(lengthAxis, 0),
+        w2: edge(lengthAxis, 1),
+      };
   const length = sizeOf(spec.box, lengthAxis);
   const width = sizeOf(spec.box, widthAxis);
   return {
@@ -187,7 +221,41 @@ export function makePart(spec: PartSpec, ctx: PartContext): Part {
     cutWidth: width - banding.l1 - banding.l2,
     comment: spec.comment,
     hinge: spec.hinge,
+    profile: spec.profile,
+    frontKey: spec.frontKey,
+    frontProfile: spec.frontProfile,
+    facing: spec.facing,
+    pullEdge: spec.pullEdge,
   };
+}
+
+/** In-plane axes of a panel, in x→y→z order (the order profile points use). */
+export const planeAxes = (t: Axis): [Axis, Axis] => otherAxes(t);
+
+/** Total banded edge length of a part, mm. */
+export function bandedLength(p: Part): number {
+  if (p.profile) {
+    const pts = p.profile.points;
+    const eb = p.profile.edgeBanding ?? [];
+    let sum = 0;
+    for (let i = 0; i < pts.length; i++) {
+      if (!(eb[i] > 0)) continue;
+      const q = pts[(i + 1) % pts.length];
+      sum += Math.hypot(q.x - pts[i].x, q.y - pts[i].y);
+    }
+    return sum;
+  }
+  const b = p.banding;
+  return (b.l1 > 0 ? p.length : 0) + (b.l2 > 0 ? p.length : 0) + (b.w1 > 0 ? p.width : 0) + (b.w2 > 0 ? p.width : 0);
+}
+
+/** Banding description for cutlists: "L1,L2,W1,W2" thicknesses, or "shaped: n edges". */
+export function bandingLabel(p: Part): string {
+  if (p.profile) {
+    const n = (p.profile.edgeBanding ?? []).filter((b) => b > 0).length;
+    return n ? `shaped: ${n} edge${n === 1 ? '' : 's'}` : 'shaped: none';
+  }
+  return bandingCode(p.banding);
 }
 
 export const box = (x: number, y: number, z: number, sx: number, sy: number, sz: number): PartBox => ({ x, y, z, sx, sy, sz });

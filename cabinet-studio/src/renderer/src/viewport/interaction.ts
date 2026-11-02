@@ -120,6 +120,13 @@ export class Interaction {
     // Pressing on something: it gets selected and dragging it must not orbit the camera.
     this.engine.setControlsEnabled(false);
     if (pick.kind === 'handle') return;
+    const cur = s.selection;
+    // Second click on a front of the already-selected cabinet selects that door/drawer.
+    if (pick.kind === 'item' && cur?.kind === 'item' && cur.id === pick.id && pick.frontKey) {
+      if (cur.front !== pick.frontKey) s.select({ kind: 'item', id: pick.id, front: pick.frontKey });
+      return;
+    }
+    if (cur?.kind === pick.kind && cur.id === pick.id && !cur.front) return;
     s.select({ kind: pick.kind, id: pick.id });
   };
 

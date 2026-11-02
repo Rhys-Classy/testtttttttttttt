@@ -102,6 +102,7 @@ export function mirrorItem(doc: ProjectDocument, id: Id): ProjectDocument {
         hingeSide: flip(p.hingeSide),
         ends: { left: p.ends.right, right: p.ends.left },
         blind: p.blind ? { ...p.blind, side: flip(p.blind.side) } : p.blind,
+        corner: p.corner ? { ...p.corner, side: flip(p.corner.side) } : p.corner,
         fronts: p.fronts.map((f) => (f.hinge ? { ...f, hinge: flip(f.hinge) } : f)),
       },
     };
@@ -112,7 +113,7 @@ export function mirrorItem(doc: ProjectDocument, id: Id): ProjectDocument {
 export function rotateItem(doc: ProjectDocument, id: Id, angle: number): ProjectDocument {
   return updateItem<Item>(doc, id, (i) => {
     const w = itemWidth(i);
-    const d = i.kind === 'cabinet' ? i.params.depth : i.depth;
+    const d = i.kind === 'cabinet' ? (i.params.corner ? i.params.corner.returnWidth : i.params.depth) : i.depth;
     const centre = localToWorld2(i.placement, { x: w / 2, y: d / 2 });
     const rotation = normalizeAngle(i.placement.rotation + angle);
     const tmp = { ...i.placement, rotation, x: 0, y: 0 };

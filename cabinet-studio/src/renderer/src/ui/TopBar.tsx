@@ -7,6 +7,7 @@ import {
   Cpu,
   Eye,
   FileDown,
+  FileText,
   FilePlus2,
   FlipHorizontal2,
   FolderOpen,
@@ -116,6 +117,7 @@ export function TopBar() {
             {item(<ListChecks size={15} />, 'Cutlist & hardware…', () => runCommand('cutlist'), close, `${mod}L`)}
             {item(<FileDown size={15} />, 'Export cutlist (CSV)…', () => void exportCutlistCsv(), close)}
             {item(<FileDown size={15} />, 'Export hardware (CSV)…', () => void exportHardwareCsv(), close)}
+            {item(<FileText size={15} />, 'Drawings (PDF)…', () => runCommand('drawings'), close, `${mod}P`)}
             {item(<Camera size={15} />, 'Render image…', () => runCommand('render'), close, `${mod}R`)}
             <div className="menu-sep" />
             {item(<Cpu size={15} />, 'Graphics & GPU…', () => runCommand('gpu'), close)}
@@ -197,6 +199,9 @@ export function TopBar() {
           </>
         )}
       </Menu>
+      <button className="tb-btn" onClick={() => runCommand('drawings')} title={`Drawings (${mod}P)`}>
+        <FileText size={15} /> Drawings
+      </button>
       <button className="tb-btn" onClick={() => runCommand('cutlist')} title={`Cutlist & hardware (${mod}L)`}>
         <ListChecks size={15} /> Cutlist
       </button>

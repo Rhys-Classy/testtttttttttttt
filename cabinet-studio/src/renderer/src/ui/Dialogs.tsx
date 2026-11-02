@@ -4,6 +4,8 @@ import { activeRoom, newId, type LightingPreset, type RenderSettings } from '@en
 import type { GpuReport as BridgeGpuReport } from '@shared/ipc';
 import {
   cutlistData,
+  drawingSet,
+  exportDrawingsPdf,
   deleteSelection,
   discardRecovery,
   duplicateSelection,
@@ -176,6 +178,50 @@ const RESOLUTIONS = [
   { label: '4K 3840 × 2160', w: 3840, h: 2160 },
   { label: 'A3 print 4961 × 3508', w: 4961, h: 3508 },
 ];
+
+function DrawingsDialog() {
+  const doc = useStore((s) => s.doc);
+  const sheets = useMemo(() => drawingSet(), [doc]);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Modal
+      wide
+      title="Drawings"
+      icon={<FileDown size={18} />}
+      onClose={close}
+      footer={
+        <>
+          <span className="muted" style={{ marginRight: 'auto' }}>
+            {sheets.length} A3 sheet{sheets.length === 1 ? '' : 's'}: floor plan and an elevation for every wall with cabinets. Dimensions come from the same model as the cutlist.
+          </span>
+          <button className="btn" onClick={close}>
+            Close
+          </button>
+          <button
+            className="btn primary"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              await exportDrawingsPdf();
+              setBusy(false);
+            }}
+          >
+            <FileDown size={14} /> {busy ? 'Exporting…' : 'Export PDF'}
+          </button>
+        </>
+      }
+    >
+      <div className="sheets">
+        {sheets.map((s) => (
+          <figure key={s.title} className="sheet-preview">
+            <div className="sheet-svg" dangerouslySetInnerHTML={{ __html: s.svg }} />
+            <figcaption>{s.title}</figcaption>
+          </figure>
+        ))}
+      </div>
+    </Modal>
+  );
+}
 
 function RenderDialog() {
   const doc = useStore((s) => s.doc);
@@ -417,6 +463,8 @@ export function Dialogs() {
       return <NewProjectDialog />;
     case 'cutlist':
       return <CutlistDialog />;
+    case 'drawings':
+      return <DrawingsDialog />;
     case 'render':
       return <RenderDialog />;
     case 'recovery':

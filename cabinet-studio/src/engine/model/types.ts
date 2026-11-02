@@ -218,6 +218,30 @@ export interface BlindSpec {
   width: number;
 }
 
+/** Door / drawer front profile. Manufacturing detail goes on the part comment. */
+export type FrontProfile = 'slab' | 'shaker' | 'v-groove' | 'j-pull';
+
+/**
+ * L-shaped corner cabinet. The cabinet's width runs along the back wall and
+ * `returnWidth` along the side wall; `depth` is the depth of both wings.
+ * 'left' sits in the corner on the viewer's left when facing the back wall.
+ */
+export interface CornerSpec {
+  side: 'left' | 'right';
+  returnWidth: number;
+  doors: 'bifold' | 'separate';
+}
+
+/** Manual adjustments to one door or drawer front, keyed by its front key. */
+export interface FrontOverride {
+  hinge?: HingeSide;
+  handle?: HandleStyle;
+  profile?: FrontProfile;
+  materialId?: Id;
+  /** Extend (+) or reduce (−) each edge, mm. */
+  trim?: { left?: number; right?: number; top?: number; bottom?: number };
+}
+
 export interface CabinetParams {
   width: number;
   height: number;
@@ -229,6 +253,9 @@ export interface CabinetParams {
   handle: HandleStyle;
   ends: { left: EndMode; right: EndMode };
   blind?: BlindSpec | null;
+  /** Front profile for every door and drawer front (default slab). */
+  profile?: FrontProfile;
+  corner?: CornerSpec | null;
 }
 
 export type LayerId = 'walls' | 'openings' | 'base' | 'wall' | 'tall' | 'panels' | 'tops' | 'dimensions';
@@ -254,6 +281,8 @@ export interface CabinetItem extends ItemBase {
   overrides?: Partial<ConstructionRules>;
   /** Per-cabinet material overrides. */
   materials?: Partial<MaterialAssignment>;
+  /** Individual door / drawer front adjustments, keyed by front key (see Part.frontKey). */
+  frontOverrides?: Record<string, FrontOverride>;
 }
 
 export type PanelType = 'end-panel' | 'filler' | 'benchtop' | 'splashback';

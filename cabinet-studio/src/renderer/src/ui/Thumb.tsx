@@ -14,7 +14,31 @@ import {
 
 const materials = new Map(LIBRARY_MATERIALS.map((m) => [m.id, m]));
 
+/** Corner cabinets read best in plan: the L carcass with its two door lines. */
+function CornerThumb({ t }: { t: CabinetTemplate }) {
+  const { width: W, depth: D } = t.params;
+  const R = t.params.corner!.returnWidth;
+  const pad = 60;
+  // Plan view with the back wall at the top: local y (front→back) maps to −screen y.
+  const P = (x: number, y: number) => `${pad + x},${pad + (R - y)}`;
+  const L = [P(0, 0), P(D, 0), P(D, R - D), P(W, R - D), P(W, R), P(0, R)].join(' ');
+  return (
+    <svg viewBox={`0 0 ${W + pad * 2} ${R + pad * 2}`} width="100%" height="100%" preserveAspectRatio="xMidYMid meet">
+      <line x1={pad - 20} y1={pad} x2={pad + W + 20} y2={pad} stroke="#55606e" strokeWidth={14} />
+      <line x1={pad} y1={pad - 20} x2={pad} y2={pad + R + 20} stroke="#55606e" strokeWidth={14} />
+      <polygon points={L} fill="#2b323c" stroke="#9fb0c3" strokeWidth={10} />
+      <line x1={pad + D + 10} y1={pad + R} x2={pad + D + 10} y2={pad + D} stroke="#dfe6ee" strokeWidth={22} />
+      <line x1={pad + D + 10} y1={pad + D - 10} x2={pad + W} y2={pad + D - 10} stroke="#dfe6ee" strokeWidth={22} />
+    </svg>
+  );
+}
+
 export function CabinetThumb({ t }: { t: CabinetTemplate }) {
+  if (t.params.corner) return <CornerThumb t={t} />;
+  return <FrontThumb t={t} />;
+}
+
+function FrontThumb({ t }: { t: CabinetTemplate }) {
   const svg = useMemo(() => {
     const cab = cabinetFromTemplate(t, 'T');
     const b = buildCabinet(cab, { rules: DEFAULT_RULES, materialFor: (s) => DEFAULT_MATERIAL_ASSIGNMENT[s], materials, finishedEnds: { left: false, right: false } });

@@ -32,6 +32,14 @@ export interface ExportRequest {
   filters: FileFilter[];
 }
 
+export interface PdfRequest {
+  /** Self-contained HTML (inline SVG, no scripts). */
+  html: string;
+  suggestedName: string;
+  /** Save to this path without a dialog (automation/tests). */
+  path?: string;
+}
+
 export interface AutosaveRecord {
   content: string;
   savedAt: string;
@@ -58,6 +66,7 @@ export type MenuCommand =
   | 'export-cutlist'
   | 'export-image'
   | 'cutlist'
+  | 'drawings'
   | 'render'
   | 'view-plan'
   | 'view-front'
@@ -74,6 +83,8 @@ export interface CabinetStudioBridge {
   openProjectAt(path: string): Promise<OpenedFile>;
   saveProject(req: SaveRequest): Promise<SavedFile | null>;
   exportFile(req: ExportRequest): Promise<string | null>;
+  /** Render HTML to a PDF file. Returns the saved path, or null if cancelled. */
+  printPdf(req: PdfRequest): Promise<string | null>;
   writeAutosave(rec: AutosaveRecord): Promise<void>;
   readAutosave(): Promise<AutosaveRecord | null>;
   clearAutosave(): Promise<void>;
@@ -91,6 +102,7 @@ export const IPC = {
   openAt: 'project:open-at',
   save: 'project:save',
   export: 'file:export',
+  printPdf: 'file:print-pdf',
   autosaveWrite: 'autosave:write',
   autosaveRead: 'autosave:read',
   autosaveClear: 'autosave:clear',

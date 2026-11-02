@@ -1,7 +1,7 @@
 // Cutlists and hardware schedules straight from the construction engine's parts.
 // No re-measuring and no approximation: each row is a set of identical parts.
 
-import { bandingCode, bandedEdgeCount, type HardwarePlacement, type ItemBuild, type Part } from '../construction/parts';
+import { bandedEdgeCount, bandedLength, bandingLabel, type HardwarePlacement, type ItemBuild, type Part } from '../construction/parts';
 import type { Id, MaterialDef } from '../model/types';
 
 export interface CutlistRow {
@@ -16,6 +16,8 @@ export interface CutlistRow {
   banding: string;
   bandedEdges: number;
   grain: boolean;
+  /** Non-rectangular part: sizes are the bounding blank, the outline is cut by CNC. */
+  shaped: boolean;
   /** Item labels with counts, e.g. "C1, C3 (2)". */
   items: string;
   comment: string;
@@ -62,7 +64,7 @@ export function buildCutlist(builds: Iterable<ItemBuild>, materials: ReadonlyMap
     let area = 0;
     let banding = 0;
     for (const p of g.parts) {
-      const code = bandingCode(p.banding);
+      const code = bandingLabel(p);
       const rk = [p.name, r1(p.cutLength), r1(p.cutWidth), code, p.comment ?? ''].join('|');
       let entry = rows.get(rk);
       if (!entry) {
@@ -77,8 +79,9 @@ export function buildCutlist(builds: Iterable<ItemBuild>, materials: ReadonlyMap
             width: r1(p.width),
             thickness: r1(p.thickness),
             banding: code,
-            bandedEdges: bandedEdgeCount(p.banding),
+            bandedEdges: p.profile ? (p.profile.edgeBanding ?? []).filter((b) => b > 0).length : bandedEdgeCount(p.banding),
             grain: !!m?.grain,
+            shaped: !!p.profile,
             items: '',
             comment: p.comment ?? '',
           },
@@ -89,7 +92,7 @@ export function buildCutlist(builds: Iterable<ItemBuild>, materials: ReadonlyMap
       entry.row.quantity++;
       entry.labels.push(p.itemLabel);
       area += (p.cutLength * p.cutWidth) / 1e6;
-      banding += ((p.banding.l1 > 0 ? p.length : 0) + (p.banding.l2 > 0 ? p.length : 0) + (p.banding.w1 > 0 ? p.width : 0) + (p.banding.w2 > 0 ? p.width : 0)) / 1000;
+      banding += bandedLength(p) / 1000;
     }
     const list = [...rows.values()].map((e) => ({ ...e.row, items: itemSummary(e.labels) }));
     list.sort((a, b) => b.cutLength * b.cutWidth - a.cutLength * a.cutWidth || a.name.localeCompare(b.name));
@@ -144,12 +147,12 @@ const csvCell = (v: string | number): string => {
 };
 
 export function cutlistToCsv(groups: CutlistGroup[]): string {
-  const header = ['Material', 'Thickness (mm)', 'Qty', 'Cut length (mm)', 'Cut width (mm)', 'Finished length (mm)', 'Finished width (mm)', 'Part', 'Edge banding L1,L2,W1,W2 (mm)', 'Grain', 'Items', 'Comment'];
+  const header = ['Material', 'Thickness (mm)', 'Qty', 'Cut length (mm)', 'Cut width (mm)', 'Finished length (mm)', 'Finished width (mm)', 'Part', 'Edge banding L1,L2,W1,W2 (mm)', 'Grain', 'Shape', 'Items', 'Comment'];
   const lines = [header.map(csvCell).join(',')];
   for (const g of groups) {
     for (const r of g.rows) {
       lines.push(
-        [g.materialName, g.thickness, r.quantity, r.cutLength, r.cutWidth, r.length, r.width, r.name, r.banding, r.grain ? 'Along length' : '', r.items, r.comment]
+        [g.materialName, g.thickness, r.quantity, r.cutLength, r.cutWidth, r.length, r.width, r.name, r.banding, r.grain ? 'Along length' : '', r.shaped ? 'Shaped (CNC outline)' : 'Rectangle', r.items, r.comment]
           .map(csvCell)
           .join(','),
       );

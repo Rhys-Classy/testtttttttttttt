@@ -12,6 +12,8 @@ import {
   createProject,
   cutlistToCsv,
   DEFAULT_AUTO_TOPS,
+  drawingSheets,
+  sheetsToHtml,
   duplicateItems,
   findItem,
   hardwareToCsv,
@@ -301,6 +303,24 @@ export async function exportPng(dataUrl: string, suffix: string): Promise<void> 
   }
 }
 
+export function drawingSet() {
+  const doc = S().doc;
+  const d = derive(doc);
+  const names = new Map(activeRoom(doc).walls.map((w, i) => [w.id, i < 26 ? String.fromCharCode(65 + i) : `W${i + 1}`]));
+  return drawingSheets(doc, d, (id) => names.get(id) ?? '?');
+}
+
+export async function exportDrawingsPdf(): Promise<void> {
+  const sheets = drawingSet();
+  const doc = S().doc;
+  try {
+    const out = await platform.printPdf({ html: sheetsToHtml(sheets, doc.name), suggestedName: `${safeName(doc.name)} - drawings.pdf` });
+    if (out) S().toast('success', `Drawings exported (${sheets.length} sheet${sheets.length === 1 ? '' : 's'}).`);
+  } catch (e) {
+    S().toast('error', `Couldn't export drawings: ${describeError(e)}`);
+  }
+}
+
 // ───────────────────────────── Autosave & recovery ─────────────────────────────
 
 let lastAutosaved: ProjectDocument | null = null;
@@ -377,6 +397,9 @@ export function runCommand(cmd: MenuCommand): void {
       return;
     case 'cutlist':
       useStore.setState({ dialog: 'cutlist' });
+      return;
+    case 'drawings':
+      useStore.setState({ dialog: 'drawings' });
       return;
     case 'export-cutlist':
       void exportCutlistCsv();

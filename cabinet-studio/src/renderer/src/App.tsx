@@ -55,13 +55,14 @@ function onKey(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
     if (s.txBase) s.cancelPreview();
     else if (s.tool !== 'select') s.setTool('select');
+    else if (s.selection?.front) s.select({ kind: s.selection.kind, id: s.selection.id });
     else s.select(null);
     useStore.setState({ contextMenu: null });
     return;
   }
   if (ctrl) {
     // In the desktop app these come through the native menu instead.
-    if (isDesktop && ['z', 'y', 's', 'o', 'n', 'l', 'r'].includes(k)) return;
+    if (isDesktop && ['z', 'y', 's', 'o', 'n', 'l', 'r', 'p'].includes(k)) return;
     if (k === 'z') runCommand(e.shiftKey ? 'redo' : 'undo');
     else if (k === 'y') runCommand('redo');
     else if (k === 's') runCommand(e.shiftKey ? 'save-as' : 'save');
@@ -69,6 +70,7 @@ function onKey(e: KeyboardEvent): void {
     else if (k === 'n') runCommand('new');
     else if (k === 'l') runCommand('cutlist');
     else if (k === 'r') runCommand('render');
+    else if (k === 'p') runCommand('drawings');
     else if (k === 'd') duplicateSelection();
     else return;
     e.preventDefault();

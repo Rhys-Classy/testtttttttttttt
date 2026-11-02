@@ -54,14 +54,28 @@ function pointCovered(w: Vec3, selfId: string, grid: ItemGrid, walls: WallGeomet
   return false;
 }
 
+/** Probe points just outside one end face of a cabinet (local x, y). */
+function endProbes(cab: CabinetItem, side: 'left' | 'right'): { x: number; y: number }[] {
+  const p = cab.params;
+  const f = [0.2, 0.5, 0.8];
+  const c = p.corner;
+  if (!c) return f.map((k) => ({ x: side === 'left' ? -PROBE : p.width + PROBE, y: p.depth * k }));
+  const R = c.returnWidth;
+  const D = p.depth;
+  // The end on the long wing is a normal side; the other end is the front end of the return wing.
+  const longEnd = c.side === 'left' ? 'right' : 'left';
+  if (side === longEnd) return f.map((k) => ({ x: side === 'left' ? -PROBE : p.width + PROBE, y: R - D + D * k }));
+  const x0 = c.side === 'left' ? 0 : p.width - D;
+  return f.map((k) => ({ x: x0 + D * k, y: -PROBE }));
+}
+
 function covered(cab: CabinetItem, side: 'left' | 'right', grid: ItemGrid, walls: WallGeometry[]): boolean {
   const p = cab.params;
-  const x = side === 'left' ? -PROBE : p.width + PROBE;
   const zs = [p.kickHeight + (p.height - p.kickHeight) * 0.3, p.kickHeight + (p.height - p.kickHeight) * 0.7];
-  const ys = [p.depth * 0.2, p.depth * 0.5, p.depth * 0.8];
+  const probes = endProbes(cab, side);
   let hits = 0;
-  for (const y of ys) for (const z of zs) if (pointCovered(localToWorld3(cab.placement, { x, y, z }), cab.id, grid, walls)) hits++;
-  return hits >= Math.ceil(ys.length * zs.length * 0.6);
+  for (const pr of probes) for (const z of zs) if (pointCovered(localToWorld3(cab.placement, { x: pr.x, y: pr.y, z }), cab.id, grid, walls)) hits++;
+  return hits >= Math.ceil(probes.length * zs.length * 0.6);
 }
 
 export function resolveEnds(room: Room, walls: Map<string, WallGeometry>): Map<string, EndState> {

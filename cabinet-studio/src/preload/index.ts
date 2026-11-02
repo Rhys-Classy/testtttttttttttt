@@ -8,6 +8,7 @@ const bridge: CabinetStudioBridge = {
   openProjectAt: (path) => ipcRenderer.invoke(IPC.openAt, path),
   saveProject: (req) => ipcRenderer.invoke(IPC.save, req),
   exportFile: (req) => ipcRenderer.invoke(IPC.export, req),
+  printPdf: (req) => ipcRenderer.invoke(IPC.printPdf, req),
   writeAutosave: (rec) => ipcRenderer.invoke(IPC.autosaveWrite, rec),
   readAutosave: () => ipcRenderer.invoke(IPC.autosaveRead),
   clearAutosave: () => ipcRenderer.invoke(IPC.autosaveClear),

@@ -19,6 +19,8 @@ export interface Extents {
 export function itemExtents(item: Item, frontProjection: number): Extents {
   if (item.kind === 'cabinet') {
     const p = item.params;
+    // Corner cabinets' fronts sit inside their L-shaped bounding box.
+    if (p.corner) return { x0: 0, x1: p.width, y0: 0, y1: p.corner.returnWidth, z0: 0, z1: p.height };
     return { x0: 0, x1: p.width, y0: -frontProjection, y1: p.depth, z0: 0, z1: p.height };
   }
   return { x0: 0, x1: item.width, y0: 0, y1: item.depth, z0: 0, z1: item.height };
@@ -28,7 +30,7 @@ export function itemExtents(item: Item, frontProjection: number): Extents {
 export function bodyExtents(item: Item): Extents {
   if (item.kind === 'cabinet') {
     const p = item.params;
-    return { x0: 0, x1: p.width, y0: 0, y1: p.depth, z0: 0, z1: p.height };
+    return { x0: 0, x1: p.width, y0: 0, y1: p.corner ? p.corner.returnWidth : p.depth, z0: 0, z1: p.height };
   }
   return { x0: 0, x1: item.width, y0: 0, y1: item.depth, z0: 0, z1: item.height };
 }
