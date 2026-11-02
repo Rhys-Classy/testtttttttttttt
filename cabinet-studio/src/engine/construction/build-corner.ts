@@ -230,8 +230,8 @@ export function buildCornerCabinet(cab: CabinetItem, ctx: BuildContext): ItemBui
   if (k > 0) {
     const ks = r.kickSetback;
     const kt = r.kickThickness;
-    add({ key: 'kick', role: 'kick', name: 'Kickboard', slot: 'kick', box: box(D - ks - kt, R - D + ks, 0, W - (D - ks - kt), kt, k - r.kickTopGap), thicknessAxis: 'y', lengthAxis: 'x' });
-    add({ key: 'kick-b', role: 'kick', name: 'Kickboard (return)', slot: 'kick', box: box(D - ks - kt, 0, 0, kt, R - D + ks, k - r.kickTopGap), thicknessAxis: 'x', lengthAxis: 'y' });
+    if (p.kickboard !== false) add({ key: 'kick', role: 'kick', name: 'Kickboard', slot: 'kick', box: box(D - ks - kt, R - D + ks, 0, W - (D - ks - kt), kt, k - r.kickTopGap), thicknessAxis: 'y', lengthAxis: 'x' });
+    if (p.kickboard !== false) add({ key: 'kick-b', role: 'kick', name: 'Kickboard (return)', slot: 'kick', box: box(D - ks - kt, 0, 0, kt, R - D + ks, k - r.kickTopGap), thicknessAxis: 'x', lengthAxis: 'y' });
     addHw({ key: 'legs', hardwareId: 'leg-adjustable', qty: 6 });
   }
 

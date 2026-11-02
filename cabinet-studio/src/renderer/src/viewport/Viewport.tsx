@@ -43,7 +43,7 @@ export function setRendererPreference(p: 'auto' | 'webgl2', sessionOnly = false)
 export const getEngine = (): RenderEngine | null => engineSingleton;
 
 const HINTS: Record<State['view'], string> = {
-  '3d': 'Drag empty space to orbit · right-drag to pan · scroll to zoom · drag cabinets to move',
+  '3d': 'Drag empty space or middle-drag to orbit · right-drag to pan · scroll to zoom at cursor · drag cabinets to move',
   plan: 'Drag to pan · scroll to zoom · drag cabinets to move',
   front: 'Drag cabinets along the wall or up/down · scroll to zoom',
   side: 'Section through the room · scroll to zoom',
@@ -76,7 +76,7 @@ export function Viewport() {
     const sync = () => {
       const s = useStore.getState();
       const d = derive(s.doc);
-      engine.sync({ doc: s.doc, derived: d, selection: s.selection, hoverId: s.hoverId, layers: s.layers, showEdges: s.showEdges, view: s.view, elevationFace: elevationFace(s, d) });
+      engine.sync({ doc: s.doc, derived: d, selection: s.selection, hoverId: s.hoverId, layers: s.layers, showEdges: s.showEdges, view: s.view, elevationFace: elevationFace(s, d), xray: s.xray, night: s.theme === 'night' });
       overlayRef.current = computeOverlay(s, d, s.doc);
       engine.requestRender();
     };
@@ -144,6 +144,8 @@ export function Viewport() {
           s.hoverId !== p.hoverId ||
           s.layers !== p.layers ||
           s.showEdges !== p.showEdges ||
+          s.xray !== p.xray ||
+          s.theme !== p.theme ||
           s.guides !== p.guides ||
           s.drawing !== p.drawing ||
           s.measure !== p.measure ||

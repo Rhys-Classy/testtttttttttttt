@@ -55,6 +55,7 @@ export class Interaction {
     el.addEventListener('pointerdown', this.onDown, true);
     window.addEventListener('pointermove', this.onMove, true);
     window.addEventListener('pointerup', this.onUp, true);
+    el.addEventListener('mousedown', this.onMouseDown);
     el.addEventListener('dblclick', this.onDblClick);
     el.addEventListener('contextmenu', this.onContext);
   }
@@ -63,10 +64,16 @@ export class Interaction {
     this.el.removeEventListener('pointerdown', this.onDown, true);
     window.removeEventListener('pointermove', this.onMove, true);
     window.removeEventListener('pointerup', this.onUp, true);
+    this.el.removeEventListener('mousedown', this.onMouseDown);
     this.el.removeEventListener('dblclick', this.onDblClick);
     this.el.removeEventListener('contextmenu', this.onContext);
     cancelAnimationFrame(this.hoverRaf);
   }
+
+  // Stops the browser's middle-click autoscroll so middle-drag can orbit.
+  private onMouseDown = (e: MouseEvent): void => {
+    if (e.button === 1) e.preventDefault();
+  };
 
   private inCanvas(e: PointerEvent | MouseEvent): boolean {
     return e.target instanceof HTMLCanvasElement || (e.target as HTMLElement)?.closest?.('.viewport-overlay') != null;

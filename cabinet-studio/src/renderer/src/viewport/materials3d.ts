@@ -87,7 +87,23 @@ export class MaterialCache {
     return mat;
   }
 
+  private xrayMats = new Map<string, THREE.Material>();
+
+  xray(base: THREE.Material): THREE.Material {
+    let m = this.xrayMats.get(base.uuid);
+    if (!m) {
+      m = base.clone();
+      m.transparent = true;
+      m.opacity = 0.22;
+      m.depthWrite = false;
+      this.xrayMats.set(base.uuid, m);
+    }
+    return m;
+  }
+
   clear(): void {
+    for (const m of this.xrayMats.values()) m.dispose();
+    this.xrayMats.clear();
     for (const { mat } of this.cache.values()) mat.dispose();
     for (const t of this.textures) t.dispose();
     this.cache.clear();

@@ -44,6 +44,8 @@ export interface SyncInput {
   showEdges: boolean;
   view: ViewMode;
   elevationFace: WallFace | null;
+  xray: boolean;
+  night: boolean;
 }
 
 interface ItemEntry {
@@ -79,7 +81,7 @@ export function itemLayer(item: Item): LayerId {
 export class RenderEngine {
   renderer!: THREE.WebGPURenderer;
   readonly scene = new THREE.Scene();
-  readonly persp = new THREE.PerspectiveCamera(45, 1, 0.05, 300);
+  readonly persp = new THREE.PerspectiveCamera(45, 1, 0.02, 300);
   readonly ortho = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.01, 400);
   camera: THREE.PerspectiveCamera | THREE.OrthographicCamera = this.persp;
   orbit!: OrbitControls;
@@ -174,9 +176,10 @@ export class RenderEngine {
     this.orbit.enableDamping = true;
     this.orbit.dampingFactor = 0.12;
     this.orbit.maxPolarAngle = Math.PI / 2 - 0.01;
-    this.orbit.minDistance = 0.3;
+    this.orbit.minDistance = 0.1;
+    this.orbit.zoomToCursor = true;
     this.orbit.maxDistance = 60;
-    this.orbit.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+    this.orbit.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN };
     this.orbit.addEventListener('change', () => this.requestRender());
 
     this.orthoControls = new OrbitControls(this.ortho, el);
@@ -376,8 +379,9 @@ export class RenderEngine {
     for (const id of [...this.items.keys()]) if (!live.has(id)) this.removeItem(id);
 
     // Visibility, hover and selection
+    this.applyItemVisibility();
+    this.applyXray(input.xray);
     for (const [id, e] of this.items) {
-      e.obj.group.visible = input.layers[e.layer];
       if (e.obj.edges) e.obj.edges.material = id === input.hoverId && input.selection?.id !== id ? this.materials.edgeHover : this.materials.edge;
     }
     this.wallsGroup.visible = input.layers.walls;
@@ -386,6 +390,25 @@ export class RenderEngine {
     this.syncLighting(doc.render, input);
     this.updateBounds(input);
     this.requestRender();
+  }
+
+  private applyItemVisibility(): void {
+    const input = this.lastInput;
+    if (!input) return;
+    for (const e of this.items.values()) e.obj.group.visible = input.layers[e.layer] && !(this.view === 'plan' && e.layer === 'tops');
+  }
+
+  private applyXray(on: boolean): void {
+    for (const e of this.items.values()) {
+      e.obj.group.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.userData.xray !== true) return;
+        const base = m.userData.baseMat as THREE.Material;
+        m.material = on ? this.materials.xray(base) : base;
+        // A see-through door must not throw a solid shadow into the cabinet.
+        m.castShadow = !on;
+      });
+    }
   }
 
   private rebuildAll(): void {
@@ -497,12 +520,14 @@ export class RenderEngine {
   private syncLighting(r: RenderSettings, input: SyncInput): void {
     this.renderSettings = r;
     const L = LIGHTING[r.lighting];
-    this.scene.background = new THREE.Color(this.view === 'plan' || this.view === 'front' || this.view === 'side' ? 0x15171b : L.bg);
-    this.scene.environmentIntensity = L.env;
+    const night = input.night;
+    const ortho = this.view === 'plan' || this.view === 'front' || this.view === 'side';
+    this.scene.background = ortho ? new THREE.Color(night ? 0x0b0c0e : 0x15171b) : new THREE.Color(L.bg).multiplyScalar(night ? 0.5 : 1);
+    this.scene.environmentIntensity = L.env * (night ? 0.7 : 1);
     this.hemi.intensity = L.hemi;
     this.sun.color.set(L.sun);
     this.sun.intensity = r.sunIntensity * L.sunScale;
-    this.renderer.toneMappingExposure = r.exposure;
+    this.renderer.toneMappingExposure = r.exposure * (night ? 0.6 : 1);
     // Under-cabinet LED strips: one emissive strip and one light per wall cabinet (capped).
     const on = r.underCabinetLights || r.lighting === 'evening';
     const key = [on, input.derived.room.items];
@@ -579,6 +604,7 @@ export class RenderEngine {
       const edgesAfter = this.lastInput.showEdges || view !== '3d';
       if (edgesBefore !== edgesAfter) this.rebuildAll();
       else this.sync({ ...this.lastInput, view, elevationFace: face });
+      this.applyItemVisibility();
     }
     this.requestRender();
   }
@@ -675,9 +701,9 @@ export class RenderEngine {
     for (const [id, meshes] of this.wallMeshes) {
       const ghost = hidden.has(id);
       for (const m of meshes) {
-        m.visible = !(ghost && this.view !== '3d');
+        m.visible = !ghost;
         if (m.userData.baseMat === undefined) m.userData.baseMat = m.material;
-        m.material = ghost ? this.materials.ghostWall : (m.userData.baseMat as THREE.Material);
+        m.material = m.userData.baseMat as THREE.Material;
         m.castShadow = !ghost;
       }
     }

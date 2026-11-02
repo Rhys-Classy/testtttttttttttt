@@ -273,7 +273,10 @@ The drawing environment adds a **sketch model** to the document:
 - [x] L-shaped corner cabinets (base and wall, left/right, bi-fold pair or two doors) with shaped L bottoms, tops and shelves
 - [x] Dimensioned A3 PDF drawings: floor plan + an elevation for every wall with cabinets (width/height chains, hinge symbols, title block)
 - [ ] Sliding doors, lift-up and pull-out hardware, channel handleless systems
-- [ ] Angled (45°) corner cabinets; applied end panels from rules; kickboards per run
+- [x] Kickboards per run ("Auto kicks"): one continuous kick per run of floor cabinets, returns at exposed ends, split at 3600 mm; covered cabinets set `params.kickboard = false` so their own kick part is not built (legs stay)
+- [x] Push left/right: slide the selection hard up against the nearest cabinet, wall, or window/door clearance zone (`pushItem`, `[` / `]`)
+- [x] Viewport: middle-drag orbit, zoom to cursor, near walls fully hidden in 3D, plan view hides benchtops, X-ray fronts/panels/kicks (hardware stays solid), Night mode
+- [ ] Angled (45°) corner cabinets; applied end panels from rules
 - [ ] Cabinet detail drawings; project versions (named snapshots)
 
 **Phase 3 — custom drawing and custom geometry**
@@ -310,6 +313,6 @@ The drawing environment adds a **sketch model** to the document:
   has no GPU (its software WebGPU adapter fails, which is how the self-test/fallback was
   proven). WebGL 2 rendering is verified. First run on a real Windows PC: check
   *Help → Graphics & GPU* shows "WebGPU" and the viewport looks right.
-- Kickboards are per cabinet (not per run); no angled corner cabinets or sheet
+- Kickboards are per cabinet unless "Auto kicks" is run; auto kicks use the project's default construction standard; no angled corner cabinets or sheet
   optimisation yet.
 - Very large scenes still issue a few draw calls per cabinet (BatchedMesh planned).

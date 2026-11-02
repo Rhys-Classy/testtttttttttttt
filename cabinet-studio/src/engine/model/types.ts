@@ -248,6 +248,8 @@ export interface CabinetParams {
   depth: number;
   /** Plinth / kick height below the carcass. 0 for wall cabinets. */
   kickHeight: number;
+  /** false when the run's kickboard is a separate auto-kick panel; legs stay. */
+  kickboard?: boolean;
   fronts: FrontSection[];
   hingeSide: HingeSide;
   handle: HandleStyle;
@@ -285,7 +287,7 @@ export interface CabinetItem extends ItemBase {
   frontOverrides?: Record<string, FrontOverride>;
 }
 
-export type PanelType = 'end-panel' | 'filler' | 'benchtop' | 'splashback';
+export type PanelType = 'end-panel' | 'filler' | 'benchtop' | 'splashback' | 'kick';
 
 /** Single-part products: end panels, fillers, benchtops, splashbacks. Local box [0,w]×[0,d]×[0,h]. */
 export interface PanelItem extends ItemBase {

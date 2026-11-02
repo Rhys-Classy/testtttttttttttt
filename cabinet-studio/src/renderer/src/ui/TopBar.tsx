@@ -30,7 +30,7 @@ import {
   Undo2,
 } from 'lucide-react';
 import type { QualityPreset } from '@engine/index';
-import { deleteSelection, duplicateSelection, exportCutlistCsv, exportHardwareCsv, mirrorSelection, rotateSelection, runAutoTops, runCommand } from '../state/actions';
+import { deleteSelection, duplicateSelection, exportCutlistCsv, exportHardwareCsv, mirrorSelection, rotateSelection, runAutoKicks, runAutoTops, runCommand } from '../state/actions';
 import { isDirty, useStore, type ViewMode } from '../state/store';
 import { QUALITY, QUALITY_ORDER } from '../viewport/quality';
 
@@ -195,6 +195,9 @@ export function TopBar() {
         </button>
         <button className="tb-btn" title="Generate benchtops and splashbacks for every run of base cabinets" onClick={runAutoTops}>
           Auto tops
+        </button>
+        <button className="tb-btn" title="Generate continuous kickboards for every run of floor cabinets" onClick={runAutoKicks}>
+          Auto kicks
         </button>
       </div>
       <div className="tb-group">

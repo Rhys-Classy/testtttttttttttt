@@ -562,7 +562,7 @@ export function buildCabinet(cab: CabinetItem, ctx: BuildContext): ItemBuild {
 
   // ── Kick and legs ──
   if (k > 0) {
-    add({
+    if (p.kickboard !== false) add({
       key: 'kick',
       role: 'kick',
       name: 'Kickboard',

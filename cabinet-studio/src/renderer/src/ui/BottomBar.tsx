@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
-import { Grid3x3, Layers, Magnet, PanelTop, Spline } from 'lucide-react';
+import { Grid3x3, Layers, Magnet, Moon, PanelTop, ScanEye, Spline } from 'lucide-react';
 import { activeRoom, type LayerId } from '@engine/index';
-import { savePrefs, useDerived, useStore } from '../state/store';
+import { savePrefs, setTheme, toggleXray, useDerived, useStore } from '../state/store';
 import { popupStyle } from './TopBar';
 
 const LAYER_LABELS: Record<LayerId, string> = {
@@ -21,6 +21,8 @@ export function BottomBar() {
   const snap = useStore((s) => s.snap);
   const layers = useStore((s) => s.layers);
   const showEdges = useStore((s) => s.showEdges);
+  const xray = useStore((s) => s.xray);
+  const theme = useStore((s) => s.theme);
   const gpu = useStore((s) => s.gpu);
   const stats = useStore((s) => s.stats);
   const d = useDerived();
@@ -92,6 +94,12 @@ export function BottomBar() {
         title="Show part edges in 3D (E)"
       >
         <Spline size={13} /> Edges
+      </button>
+      <button className={`bb-btn${xray ? ' on' : ''}`} onClick={toggleXray} title="See through doors, panels and kickboards — hardware stays visible (X)">
+        <ScanEye size={13} /> X-ray
+      </button>
+      <button className={`bb-btn${theme === 'night' ? ' on' : ''}`} onClick={() => setTheme(theme === 'night' ? 'standard' : 'night')} title="Night mode — dimmer screen for sensitive eyes">
+        <Moon size={13} /> Night
       </button>
       <div className="menu" ref={ref}>
         <button className={`bb-btn${layersOpen ? ' on' : ''}`} onClick={() => setLayersOpen(!layersOpen)}>

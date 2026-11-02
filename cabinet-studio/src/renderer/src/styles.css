@@ -21,6 +21,18 @@
   color-scheme: dark;
 }
 
+:root[data-theme='night'] {
+  --bg-0: #050608; --bg-1: #08090c; --bg-2: #0c0e11; --bg-3: #111418; --bg-4: #171b20;
+  --line: #1b1f25; --line-soft: #13161a;
+  --text: #b8bfc7; --text-2: #8a929c; --text-3: #5c6570;
+  --blue: #3570c4; --blue-2: #2a5ba3; --blue-soft: rgba(53, 112, 196, 0.14);
+  --amber: #c99442; --red: #d65456; --green: #33a874;
+}
+:root[data-theme='night'] .sheet-preview,
+:root[data-theme='night'] .cs-sheet {
+  filter: brightness(0.75);
+}
+
 * {
   box-sizing: border-box;
 }

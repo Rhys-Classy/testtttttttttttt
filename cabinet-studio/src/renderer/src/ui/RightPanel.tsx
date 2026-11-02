@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { AlertTriangle, ArrowDown, ArrowUp, Copy, FlipHorizontal2, Plus, RotateCw, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowLeftToLine, ArrowRightToLine, ArrowUp, Copy, FlipHorizontal2, Plus, RotateCw, Trash2, X } from 'lucide-react';
 import {
   activeRoom,
   bandingCode,
@@ -30,7 +30,7 @@ import {
   type ProjectDocument,
   type Wall,
 } from '@engine/index';
-import { deleteSelection, duplicateSelection, mirrorSelection, rotateSelection } from '../state/actions';
+import { deleteSelection, duplicateSelection, mirrorSelection, pushSelection, rotateSelection } from '../state/actions';
 import { deriver, useDerived, useStore } from '../state/store';
 import { wallName } from '../viewport/views';
 import { NumberField, Row, Section, Seg, TextField } from './controls';
@@ -92,6 +92,14 @@ function PlacementFields({ item }: { item: Item }) {
         </button>
         <button className="btn small" onClick={duplicateSelection}>
           <Copy size={13} /> Copy
+        </button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <button className="btn small" title="Slide hard up against the nearest cabinet, wall or window on the left ([)" onClick={() => pushSelection('left')}>
+          <ArrowLeftToLine size={13} /> Push left
+        </button>
+        <button className="btn small" title="Slide hard up against the nearest cabinet, wall or window on the right (])" onClick={() => pushSelection('right')}>
+          <ArrowRightToLine size={13} /> Push right
         </button>
       </div>
     </Section>

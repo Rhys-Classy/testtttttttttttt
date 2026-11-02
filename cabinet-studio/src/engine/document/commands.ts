@@ -176,5 +176,5 @@ export function setRectangularRoom(doc: ProjectDocument, width: number, depth: n
 }
 
 export function replaceAutoTops(doc: ProjectDocument, tops: Item[]): ProjectDocument {
-  return updateRoom(doc, (r) => ({ ...r, items: [...r.items.filter((i) => !(i.kind === 'panel' && i.auto)), ...tops] }));
+  return updateRoom(doc, (r) => ({ ...r, items: [...r.items.filter((i) => !(i.kind === 'panel' && i.auto && (i.panelType === 'benchtop' || i.panelType === 'splashback'))), ...tops] }));
 }

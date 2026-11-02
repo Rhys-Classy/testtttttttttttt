@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Box, Camera, CheckCircle2, Copy, Cpu, FilePlus2, FileDown, FlipHorizontal2, History, Info, ListChecks, RotateCw, Square, Trash2, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowLeftToLine, ArrowRightToLine, Box, Camera, CheckCircle2, Copy, Cpu, FilePlus2, FileDown, FlipHorizontal2, History, Info, ListChecks, RotateCw, Square, Trash2, XCircle } from 'lucide-react';
 import { activeRoom, newId, type LightingPreset, type RenderSettings } from '@engine/index';
 import type { GpuReport as BridgeGpuReport } from '@shared/ipc';
 import {
@@ -14,6 +14,7 @@ import {
   exportPng,
   mirrorSelection,
   newProject,
+  pushSelection,
   recover,
   rotateSelection,
 } from '../state/actions';
@@ -470,7 +471,10 @@ const SHORTCUTS: [string, string][] = [
   ['Ctrl+Z / Ctrl+Y', 'Undo / redo'],
   ['Ctrl+S / Ctrl+O', 'Save / open'],
   ['Ctrl+L / Ctrl+P / Ctrl+R', 'Cutlist / drawings / render'],
-  ['Right-drag, scroll', 'Pan, zoom (3D: left-drag empty space to orbit)'],
+  ['[ / ]', 'Push selection hard left / right'],
+  ['X', 'X-ray: see through doors, panels and kickboards'],
+  ['Right-drag, scroll', 'Pan, zoom to the cursor (3D: left-drag empty space to orbit)'],
+  ['Middle-drag', 'Orbit / tilt the 3D camera'],
 ];
 
 function ShortcutsDialog() {
@@ -581,6 +585,12 @@ export function ContextMenu() {
           </button>
           <button className="menu-item" onClick={run(mirrorSelection)} disabled={item.kind !== 'cabinet'}>
             <FlipHorizontal2 size={14} /> Mirror handing <kbd>M</kbd>
+          </button>
+          <button className="menu-item" onClick={run(() => pushSelection('left'))}>
+            <ArrowLeftToLine size={14} /> Push left <kbd>[</kbd>
+          </button>
+          <button className="menu-item" onClick={run(() => pushSelection('right'))}>
+            <ArrowRightToLine size={14} /> Push right <kbd>]</kbd>
           </button>
           {item.wallId && (
             <button className="menu-item" onClick={run(() => useStore.setState({ elevationWallId: item.wallId ?? null, view: 'front' }))}>

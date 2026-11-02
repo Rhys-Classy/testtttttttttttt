@@ -69,6 +69,9 @@ export function buildPanel(panel: PanelItem, ctx: PanelBuildContext): ItemBuild 
     case 'splashback':
       parts.push(makePart({ key: 'splash', role: 'splashback', name: panel.name || 'Splashback', slot, box: bounds, thicknessAxis: 'y', lengthAxis: 'x' }, pctx));
       break;
+    case 'kick':
+      parts.push(makePart({ key: 'kick', role: 'kick', name: 'Kickboard', slot, box: bounds, thicknessAxis: 'y', lengthAxis: 'x' }, pctx));
+      break;
   }
   const warnings: string[] = [];
   checkStock(parts, ctx.materials, warnings);

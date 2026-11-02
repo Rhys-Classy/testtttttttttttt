@@ -4,8 +4,11 @@ import {
   activeRoom,
   addItem,
   addOpening,
+  autoKicks,
   autoTops,
   boundsOf,
+  DEFAULT_AUTO_KICKS,
+  pushItem,
   buildCutlist,
   buildHardwareSchedule,
   cabinetFromTemplate,
@@ -202,6 +205,51 @@ export function runAutoTops(): void {
   doc = replaceAutoTops(doc, tops);
   s.commit(() => doc);
   s.toast(tops.length ? 'success' : 'info', tops.length ? `Generated ${bt} benchtop${bt === 1 ? '' : 's'} and ${sb} splashback${sb === 1 ? '' : 's'}.` : 'No base cabinets to put benchtops on.');
+}
+
+export function pushSelection(dir: 'left' | 'right'): void {
+  const s = S();
+  const sel = s.selection;
+  if (sel?.kind !== 'item') return;
+  const r = pushItem(s.doc, sel.id, dir);
+  if (!r) {
+    s.toast('info', `Nothing to push against on the ${dir}.`);
+    return;
+  }
+  if (r.distance === 0) {
+    s.toast('info', `Already hard up on the ${dir}.`);
+    return;
+  }
+  s.commit(() => r.doc);
+  s.toast('success', `Pushed ${Math.round(r.distance)} mm ${dir}.`);
+}
+
+export function runAutoKicks(): void {
+  const s = S();
+  const d = derive(s.doc);
+  let doc = s.doc;
+  const old = activeRoom(doc).items;
+  const oldKicks = old.filter((i) => i.kind === 'panel' && i.auto && i.panelType === 'kick').map((i) => i.id);
+  doc = removeItems(doc, oldKicks);
+  for (const i of old) {
+    if (i.kind === 'cabinet' && i.params.kickboard === false) {
+      doc = updateItem<Item>(doc, i.id, (c) => (c.kind === 'cabinet' ? { ...c, params: { ...c.params, kickboard: undefined } } : c));
+    }
+  }
+  let n = 0;
+  const std = doc.standards.find((x) => x.id === doc.defaultStandardId) ?? doc.standards[0];
+  const { panels, cabinetIds } = autoKicks(d.room, d.ends, std.rules, DEFAULT_AUTO_KICKS, () => `K${++n}`);
+  for (const p of panels) doc = addItem(doc, p);
+  for (const id of cabinetIds) {
+    doc = updateItem<Item>(doc, id, (c) => (c.kind === 'cabinet' ? { ...c, params: { ...c.params, kickboard: false } } : c));
+  }
+  s.commit(() => doc);
+  s.toast(
+    cabinetIds.length ? 'success' : 'info',
+    cabinetIds.length
+      ? `Generated ${panels.length} kickboard piece${panels.length === 1 ? '' : 's'} for ${cabinetIds.length} cabinet${cabinetIds.length === 1 ? '' : 's'}.`
+      : 'No floor cabinets to put kickboards on.',
+  );
 }
 
 // ───────────────────────────── Files ─────────────────────────────

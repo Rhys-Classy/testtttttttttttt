@@ -334,14 +334,16 @@ export function buildItemObject(
     return { group, edges: null, pickables, dispose: () => geoms.forEach((x) => x.dispose()) };
   }
 
-  const byMat = new Map<Id, Part[]>();
+  const byMat = new Map<string, Part[]>();
   for (const p of build.parts) {
-    const list = byMat.get(p.materialId);
+    const key = `${p.materialId}|${p.slot === 'front' || p.slot === 'kick' || p.slot === 'panel'}`;
+    const list = byMat.get(key);
     if (list) list.push(p);
-    else byMat.set(p.materialId, [p]);
+    else byMat.set(key, [p]);
   }
   const edgePts: number[] = [];
-  for (const [mid, parts] of byMat) {
+  for (const [key, parts] of byMat) {
+    const mid = key.slice(0, key.lastIndexOf('|'));
     const a = newArrays();
     const ranges: PartRange[] = [];
     for (const p of parts) {
@@ -359,7 +361,12 @@ export function buildItemObject(
     }
     const g = toGeometry(a);
     geoms.push(g);
-    const mesh = new THREE.Mesh(g, cache.get(materials.get(mid)));
+    const baseMat = cache.get(materials.get(mid));
+    const mesh = new THREE.Mesh(g, baseMat);
+    if (key.endsWith('|true')) {
+      mesh.userData.xray = true;
+      mesh.userData.baseMat = baseMat;
+    }
     mesh.castShadow = opts.shadows;
     mesh.receiveShadow = opts.shadows;
     mesh.userData.pick = pick;

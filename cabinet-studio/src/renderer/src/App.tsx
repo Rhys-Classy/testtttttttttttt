@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { activeRoom, addWall, pointAtLength, type Item, updateItem } from '@engine/index';
 import { isDesktop, platform } from './platform/bridge';
-import { checkRecovery, deleteSelection, duplicateSelection, mirrorSelection, openFromPath, rotateSelection, runCommand, startAutosave } from './state/actions';
-import { isDirty, savePrefs, useDerived, useStore } from './state/store';
+import { checkRecovery, deleteSelection, duplicateSelection, mirrorSelection, openFromPath, pushSelection, rotateSelection, runCommand, startAutosave } from './state/actions';
+import { isDirty, savePrefs, toggleXray, useDerived, useStore } from './state/store';
 import { BottomBar } from './ui/BottomBar';
 import { ConfirmDialog, ContextMenu, Dialogs, Toasts } from './ui/Dialogs';
 import { LeftPanel } from './ui/LeftPanel';
@@ -97,6 +97,12 @@ function onKey(e: KeyboardEvent): void {
     case 'm':
       mirrorSelection();
       break;
+    case '[':
+      pushSelection('left');
+      break;
+    case ']':
+      pushSelection('right');
+      break;
     case 'v':
       s.setTool('select');
       break;
@@ -111,6 +117,9 @@ function onKey(e: KeyboardEvent): void {
       break;
     case 'e':
       useStore.setState({ showEdges: !s.showEdges });
+      break;
+    case 'x':
+      toggleXray();
       break;
     case 'f':
       useStore.setState({ frameRequest: s.frameRequest + 1 });

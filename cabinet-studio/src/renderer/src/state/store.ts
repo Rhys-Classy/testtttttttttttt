@@ -66,11 +66,15 @@ export interface RenderStats {
   frameMs: number;
 }
 
+export type Theme = 'standard' | 'night';
+
 interface Prefs {
   quality: QualityPreset | null;
   snap: SnapSettings;
   layers: Record<LayerId, boolean>;
   showEdges: boolean;
+  xray: boolean;
+  theme: Theme;
   panels: { left: boolean; right: boolean; leftWidth: number; rightWidth: number };
 }
 
@@ -81,6 +85,8 @@ const DEFAULT_PREFS: Prefs = {
   snap: DEFAULT_SNAP,
   layers: DEFAULT_LAYERS,
   showEdges: true,
+  xray: false,
+  theme: 'standard',
   panels: { left: true, right: true, leftWidth: 288, rightWidth: 320 },
 };
 
@@ -92,6 +98,8 @@ function loadPrefs(): Prefs {
     return {
       ...DEFAULT_PREFS,
       ...p,
+      xray: p.xray === true,
+      theme: p.theme === 'night' ? 'night' : 'standard',
       snap: { ...DEFAULT_SNAP, ...p.snap },
       layers: { ...DEFAULT_LAYERS, ...p.layers },
       panels: { ...DEFAULT_PREFS.panels, ...p.panels },
@@ -101,9 +109,9 @@ function loadPrefs(): Prefs {
   }
 }
 
-export function savePrefs(s: Pick<State, 'quality' | 'snap' | 'layers' | 'showEdges' | 'panels'>): void {
+export function savePrefs(s: Pick<State, 'quality' | 'snap' | 'layers' | 'showEdges' | 'xray' | 'theme' | 'panels'>): void {
   try {
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ quality: s.quality, snap: s.snap, layers: s.layers, showEdges: s.showEdges, panels: s.panels }));
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ quality: s.quality, snap: s.snap, layers: s.layers, showEdges: s.showEdges, xray: s.xray, theme: s.theme, panels: s.panels }));
   } catch {
     // preferences are a convenience only
   }
@@ -131,6 +139,8 @@ export interface State {
   snap: SnapSettings;
   layers: Record<LayerId, boolean>;
   showEdges: boolean;
+  xray: boolean;
+  theme: Theme;
   panels: Prefs['panels'];
   gpu: GpuStatus | null;
   stats: RenderStats;
@@ -193,6 +203,8 @@ export const useStore = create<State>((set, get) => ({
   snap: prefs.snap,
   layers: prefs.layers,
   showEdges: prefs.showEdges,
+  xray: prefs.xray,
+  theme: prefs.theme,
   // Narrow windows start with the side panels closed so the viewport fits.
   panels: typeof window !== 'undefined' && window.innerWidth < 900 ? { ...prefs.panels, left: false, right: false } : prefs.panels,
   gpu: null,
@@ -280,6 +292,22 @@ export const useStore = create<State>((set, get) => ({
   dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
   set: (patch) => set(patch),
 }));
+
+export function applyTheme(theme: Theme): void {
+  if (typeof document !== 'undefined') document.documentElement.dataset.theme = theme;
+}
+applyTheme(prefs.theme);
+
+export function setTheme(theme: Theme): void {
+  useStore.setState({ theme });
+  applyTheme(theme);
+  savePrefs(useStore.getState());
+}
+
+export function toggleXray(): void {
+  useStore.setState({ xray: !useStore.getState().xray });
+  savePrefs(useStore.getState());
+}
 
 export const isDirty = (s: State): boolean => s.doc !== s.savedDoc;
 
