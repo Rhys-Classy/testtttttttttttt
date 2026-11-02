@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { Grid3x3, Layers, Magnet, PanelTop, Spline } from 'lucide-react';
 import { activeRoom, type LayerId } from '@engine/index';
 import { savePrefs, useDerived, useStore } from '../state/store';
+import { popupStyle } from './TopBar';
 
 const LAYER_LABELS: Record<LayerId, string> = {
   walls: 'Walls',
@@ -97,7 +98,7 @@ export function BottomBar() {
           <Layers size={13} /> Layers
         </button>
         {layersOpen && (
-          <div className="bb-pop">
+          <div className="bb-pop" style={popupStyle(ref.current, 'right', 'above')}>
             {(Object.keys(LAYER_LABELS) as LayerId[]).map((l) => (
               <label key={l} className="toggle">
                 <input

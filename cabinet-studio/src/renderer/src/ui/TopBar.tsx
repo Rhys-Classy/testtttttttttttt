@@ -14,6 +14,7 @@ import {
   Footprints,
   Gauge,
   Info,
+  Keyboard,
   LayoutGrid,
   ListChecks,
   MousePointer2,
@@ -42,18 +43,47 @@ function useOutside(ref: React.RefObject<HTMLElement | null>, onOut: () => void,
   }, [active, onOut, ref]);
 }
 
+/**
+ * Position a dropdown against the window (position: fixed) from its trigger, so it is
+ * never clipped by the scrolling top bar it lives in.
+ */
+export function popupStyle(trigger: HTMLElement | null, align: 'left' | 'right', placement: 'below' | 'above' = 'below'): React.CSSProperties {
+  if (!trigger) return {};
+  const r = trigger.getBoundingClientRect();
+  const vertical: React.CSSProperties = placement === 'below' ? { top: r.bottom + 6, bottom: 'auto' } : { bottom: window.innerHeight - r.top + 6, top: 'auto' };
+  const horizontal: React.CSSProperties =
+    align === 'right' ? { right: Math.max(8, window.innerWidth - r.right), left: 'auto' } : { left: Math.max(8, Math.min(r.left, window.innerWidth - 268)), right: 'auto' };
+  return { position: 'fixed', ...vertical, ...horizontal };
+}
+
 function Menu({ label, icon, children, right }: { label: string; icon?: React.ReactNode; children: (close: () => void) => React.ReactNode; right?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useOutside(ref, () => setOpen(false), open);
+  useEffect(() => {
+    if (!open) return;
+    // A fixed popup would drift if the bar scrolls or the window resizes: close it instead.
+    const close = () => setOpen(false);
+    window.addEventListener('resize', close);
+    const bar = ref.current?.closest('.topbar');
+    bar?.addEventListener('scroll', close);
+    return () => {
+      window.removeEventListener('resize', close);
+      bar?.removeEventListener('scroll', close);
+    };
+  }, [open]);
   return (
     <div className="menu" ref={ref}>
-      <button className={`tb-btn${open ? ' active' : ''}`} onClick={() => setOpen(!open)}>
+      <button className={`tb-btn${open ? ' active' : ''}`} onClick={() => setOpen(!open)} aria-expanded={open}>
         {icon}
         {label}
         <ChevronDown size={13} />
       </button>
-      {open && <div className={`menu-pop${right ? ' right' : ''}`}>{children(() => setOpen(false))}</div>}
+      {open && (
+        <div className={`menu-pop${right ? ' right' : ''}`} style={popupStyle(ref.current, right ? 'right' : 'left')}>
+          {children(() => setOpen(false))}
+        </div>
+      )}
     </div>
   );
 }
@@ -119,8 +149,14 @@ export function TopBar() {
             {item(<FileDown size={15} />, 'Export hardware (CSV)…', () => void exportHardwareCsv(), close)}
             {item(<FileText size={15} />, 'Drawings (PDF)…', () => runCommand('drawings'), close, `${mod}P`)}
             {item(<Camera size={15} />, 'Render image…', () => runCommand('render'), close, `${mod}R`)}
-            <div className="menu-sep" />
+          </>
+        )}
+      </Menu>
+      <Menu label="Help">
+        {(close) => (
+          <>
             {item(<Cpu size={15} />, 'Graphics & GPU…', () => runCommand('gpu'), close)}
+            {item(<Keyboard size={15} />, 'Keyboard shortcuts…', () => useStore.setState({ dialog: 'shortcuts' }), close)}
             {item(<Info size={15} />, 'About Cabinet Studio', () => runCommand('about'), close)}
           </>
         )}

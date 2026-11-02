@@ -445,6 +445,37 @@ function Fragmentish({ k, v }: { k: string; v: string }) {
   );
 }
 
+const SHORTCUTS: [string, string][] = [
+  ['1 – 5', 'Plan, front, side, 3D, walkthrough'],
+  ['V / W / T', 'Select, draw walls, tape measure'],
+  ['Click, then click a door', 'Select a cabinet, then one door or drawer'],
+  ['R / Shift+R', 'Rotate 90°'],
+  ['M', 'Mirror handing'],
+  ['Ctrl+D', 'Duplicate'],
+  ['Delete', 'Delete'],
+  ['Arrows (Shift)', 'Nudge 1 mm (10 mm)'],
+  ['F', 'Frame the room'],
+  ['G / E', 'Grid snap on/off, part edges on/off'],
+  ['Esc', 'Cancel, step back from a door, deselect'],
+  ['Ctrl+Z / Ctrl+Y', 'Undo / redo'],
+  ['Ctrl+S / Ctrl+O', 'Save / open'],
+  ['Ctrl+L / Ctrl+P / Ctrl+R', 'Cutlist / drawings / render'],
+  ['Right-drag, scroll', 'Pan, zoom (3D: left-drag empty space to orbit)'],
+];
+
+function ShortcutsDialog() {
+  return (
+    <Modal title="Keyboard shortcuts" icon={<Info size={18} />} onClose={close} footer={<button className="btn" onClick={close}>Close</button>}>
+      <div className="kv">
+        {SHORTCUTS.map(([k, v]) => (
+          <Fragmentish key={k} k={k} v={v} />
+        ))}
+      </div>
+      <div className="hint">Number fields accept sums: 600+18, (900-3)/2. Drag the ↔ label beside a size to scrub it.</div>
+    </Modal>
+  );
+}
+
 function AboutDialog() {
   return (
     <Modal title="Cabinet Studio" icon={<Box size={18} />} onClose={close} footer={<button className="btn" onClick={close}>Close</button>}>
@@ -473,6 +504,8 @@ export function Dialogs() {
       return <GpuDialog />;
     case 'about':
       return <AboutDialog />;
+    case 'shortcuts':
+      return <ShortcutsDialog />;
     default:
       return null;
   }
