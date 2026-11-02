@@ -8,6 +8,7 @@ import { ConfirmDialog, ContextMenu, Dialogs, Toasts } from './ui/Dialogs';
 import { LeftPanel } from './ui/LeftPanel';
 import { RightPanel } from './ui/RightPanel';
 import { TopBar } from './ui/TopBar';
+import './ui/EngineDialogs';
 import { Viewport } from './viewport/Viewport';
 import { elevationFace, wallName } from './viewport/views';
 

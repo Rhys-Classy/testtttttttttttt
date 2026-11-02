@@ -5,5 +5,5 @@
     "lib": ["ES2023"],
     "types": ["node"]
   },
-  "include": ["electron.vite.config.ts", "vite.web.config.ts", "vitest.config.ts", "src/main/**/*", "src/preload/**/*", "src/shared/**/*", "src/engine/**/*", "tests/**/*"]
+  "include": ["electron.vite.config.ts", "vite.web.config.ts", "vitest.config.ts", "src/main/**/*", "src/preload/**/*", "src/shared/**/*", "src/engine/**/*", "tests/**/*", "src/renderer/src/ipad/geometry2d.ts"]
 }

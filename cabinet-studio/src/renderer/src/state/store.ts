@@ -19,6 +19,7 @@ import {
   type Vec2,
 } from '@engine/index';
 import type { AutosaveRecord } from '@shared/ipc';
+import type { LibraryDrag } from './actions';
 
 export type ViewMode = 'plan' | 'front' | 'side' | '3d' | 'walk';
 export type Tool = 'select' | 'wall' | 'measure';
@@ -146,6 +147,8 @@ export interface State {
   stats: RenderStats;
   toasts: Toast[];
   dialog: DialogKind;
+  /** Library item waiting to be placed by a tap (iPad). */
+  armed: LibraryDrag | null;
   recovery: AutosaveRecord | null;
   guides: SnapGuide[];
   drawing: DrawState;
@@ -211,6 +214,7 @@ export const useStore = create<State>((set, get) => ({
   stats: { fps: 0, drawCalls: 0, triangles: 0, frameMs: 0 },
   toasts: [],
   dialog: null,
+  armed: null,
   recovery: null,
   guides: [],
   drawing: { points: [], cursor: null, typed: '' },

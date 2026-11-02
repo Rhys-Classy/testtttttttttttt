@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MousePointerClick } from 'lucide-react';
 import { activeRoom, addOpening, findItem, updateOpening, type Item, type OpeningKind } from '@engine/index';
 import { applySnap, createFromLibrary, OPENING_DEFAULTS, type LibraryDrag } from '../state/actions';
+import { libraryDrag } from '../state/library';
 import { derive, useStore, type State } from '../state/store';
 import { snapOpening } from '@engine/index';
 import { detectGpu } from './gpu-detect';
@@ -11,9 +12,6 @@ import { GpuSelfTestError, RenderEngine } from './RenderEngine';
 import { elevationFace, VIEW_LABELS } from './views';
 
 const itemDepth = (i: Item) => (i.kind === 'cabinet' ? i.params.depth + 18 : i.depth);
-
-/** Set by the library while one of its cards is being dragged. */
-export const libraryDrag: { current: LibraryDrag | null } = { current: null };
 
 let engineSingleton: RenderEngine | null = null;
 

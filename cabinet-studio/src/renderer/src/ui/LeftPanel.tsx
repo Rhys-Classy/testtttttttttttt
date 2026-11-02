@@ -14,7 +14,7 @@ import {
 } from '@engine/index';
 import { addFromLibrary, type LibraryDrag } from '../state/actions';
 import { askConfirm, useStore } from '../state/store';
-import { libraryDrag } from '../viewport/Viewport';
+import { libraryConfig, libraryDrag } from '../state/library';
 import { wallName } from '../viewport/views';
 import { NumberField, Row, Section } from './controls';
 import { CabinetThumb, OpeningThumb, PanelThumb } from './Thumb';
@@ -32,6 +32,7 @@ function dragProps(drag: LibraryDrag) {
     onDragEnd: () => {
       libraryDrag.current = null;
     },
+    onClick: () => libraryConfig.tapToArm && useStore.setState({ armed: drag }),
     onDoubleClick: () => addFromLibrary(drag),
     title: 'Drag into the room, or double-click to add',
   };

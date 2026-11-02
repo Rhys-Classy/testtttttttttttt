@@ -156,7 +156,7 @@ function wrap(doc: ProjectDocument, meta: SheetMeta, body: string, scale: number
 const isWallCab = (i: Item) => i.kind === 'cabinet' && i.category === 'wall';
 
 /** Plan outline of an item (L-shape for corner cabinets) in world coordinates. */
-function planOutline(i: Item): Vec2[] {
+export function planOutline(i: Item): Vec2[] {
   if (i.kind === 'cabinet' && i.params.corner) {
     const { width: W, depth: D } = i.params;
     const R = i.params.corner.returnWidth;
@@ -228,7 +228,7 @@ export function planSheet(doc: ProjectDocument, d: DerivedRoom, meta: SheetMeta)
   return { title: `Plan — ${d.room.name}`, svg: wrap(doc, meta, s.toString(), M.scale) };
 }
 
-interface ElevItem {
+export interface ElevItem {
   item: Item;
   build: ItemBuild;
   u0: number;
@@ -238,7 +238,7 @@ interface ElevItem {
 }
 
 /** Items standing against a wall face, with their extent along it. */
-function itemsOnFace(d: DerivedRoom, f: WallFace): ElevItem[] {
+export function itemsOnFace(d: DerivedRoom, f: WallFace): ElevItem[] {
   const xAxis = { x: -f.normal.y, y: f.normal.x };
   const rot = Math.atan2(xAxis.y, xAxis.x);
   const out: ElevItem[] = [];
@@ -252,6 +252,19 @@ function itemsOnFace(d: DerivedRoom, f: WallFace): ElevItem[] {
     out.push({ item: it, build, u0, u1: u0 + b.sx, z0: it.placement.elevation + b.z, z1: it.placement.elevation + b.z + b.sz });
   }
   return out;
+}
+
+/** Extent of a part along a wall face (u) and above the floor (z). */
+export function projectPartOnFace(it: Item, p: Part, f: WallFace): { u0: number; u1: number; z0: number; z1: number } {
+  const xAxis = { x: -f.normal.y, y: f.normal.x };
+  const bx = p.box;
+  const c = [
+    localToWorld2(it.placement, { x: bx.x, y: bx.y }),
+    localToWorld2(it.placement, { x: bx.x + bx.sx, y: bx.y }),
+    localToWorld2(it.placement, { x: bx.x, y: bx.y + bx.sy }),
+    localToWorld2(it.placement, { x: bx.x + bx.sx, y: bx.y + bx.sy }),
+  ].map((q) => dot(sub(q, f.a), xAxis));
+  return { u0: Math.min(...c), u1: Math.max(...c), z0: it.placement.elevation + bx.z, z1: it.placement.elevation + bx.z + bx.sz };
 }
 
 export function elevationSheet(doc: ProjectDocument, d: DerivedRoom, f: WallFace, wallName: string, meta: SheetMeta): DrawingSheet | null {
@@ -280,16 +293,7 @@ export function elevationSheet(doc: ProjectDocument, d: DerivedRoom, f: WallFace
     s.rect(X(a), Y(o.sill), X(c) - X(a), Y(o.sill + o.height) - Y(o.sill), 'l');
     if (o.kind === 'window') s.line(X((a + c) / 2), Y(o.sill), X((a + c) / 2), Y(o.sill + o.height), 'lt');
   }
-  const proj = (it: Item, p: Part) => {
-    const bx = p.box;
-    const c = [
-      localToWorld2(it.placement, { x: bx.x, y: bx.y }),
-      localToWorld2(it.placement, { x: bx.x + bx.sx, y: bx.y }),
-      localToWorld2(it.placement, { x: bx.x, y: bx.y + bx.sy }),
-      localToWorld2(it.placement, { x: bx.x + bx.sx, y: bx.y + bx.sy }),
-    ].map(U);
-    return { u0: Math.min(...c), u1: Math.max(...c), z0: it.placement.elevation + bx.z, z1: it.placement.elevation + bx.z + bx.sz };
-  };
+  const proj = (it: Item, p: Part) => projectPartOnFace(it, p, f);
   // Draw back-to-front: splashbacks and tops, then cabinets, then labels on top of everything.
   const panelFirst = [...items].sort((a, c) => Number(a.item.kind === 'cabinet') - Number(c.item.kind === 'cabinet'));
   for (const e of panelFirst) {

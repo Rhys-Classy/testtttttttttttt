@@ -13,6 +13,8 @@
     "dev:web": "vite --config vite.web.config.ts",
     "build": "electron-vite build",
     "build:web": "vite build --config vite.web.config.ts",
+    "dev:ipad": "vite --config vite.ipad.config.ts",
+    "build:ipad": "vite build --config vite.ipad.config.ts",
     "start": "electron-vite preview",
     "dist": "npm run build && electron-builder --win",
     "dist:dir": "npm run build && electron-builder --dir",
