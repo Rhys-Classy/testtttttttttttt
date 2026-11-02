@@ -103,7 +103,7 @@ export function IpadApp() {
                       s.setView('front');
                     })}
                   >
-                    {wallName(s.doc, w.id)}
+                    Wall {wallName(s.doc, w.id)}
                   </button>
                 ))}
               </div>

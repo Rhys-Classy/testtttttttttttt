@@ -131,6 +131,42 @@ export function Plan2D(): ReactElement {
   const ready = size.w > 0;
   useEffect(fit, [fit, plan, face?.id, d.room.walls.length, ready]);
 
+  // Read-only hook for automated UI tests (mirrors window.__cabinetEngine on desktop).
+  useEffect(() => {
+    const summary = (i: Item) => {
+      const xs = planOutline(i).map((p) => p.x);
+      const ys = planOutline(i).map((p) => p.y);
+      const x0 = Math.round(Math.min(...xs));
+      const x1 = Math.round(Math.max(...xs));
+      return {
+        id: i.id,
+        label: i.label,
+        type: i.kind === 'panel' ? i.panelType : 'cabinet',
+        w: i.kind === 'cabinet' ? i.params.width : Math.round(i.width),
+        x0,
+        x1,
+        cx: (x0 + x1) / 2,
+        cy: (Math.min(...ys) + Math.max(...ys)) / 2,
+        wall: !!i.wallId,
+      };
+    };
+    const hook = {
+      view: () => viewRef.current,
+      mode: () => (live.current.plan ? 'plan' : 'elevation'),
+      toScreen: (p: P2) => {
+        const r = svgRef.current!.getBoundingClientRect();
+        const s = worldToScreen(viewRef.current, sizeRef.current, p);
+        return { x: r.left + s.x, y: r.top + s.y };
+      },
+      items: () => live.current.d.room.items.filter((i) => i.kind === 'cabinet').map(summary),
+      allItems: () => live.current.d.room.items.map(summary),
+    };
+    (window as unknown as { __plan2d?: typeof hook }).__plan2d = hook;
+    return () => {
+      delete (window as unknown as { __plan2d?: typeof hook }).__plan2d;
+    };
+  }, []);
+
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return;
@@ -235,8 +271,9 @@ export function Plan2D(): ReactElement {
       if (pointers.current.size < 2 || !G.pair) return;
       const [a, b] = [...pointers.current.values()];
       const next: [P2, P2] = [a, b];
-      setView((v) => pinch(v, sizeRef.current, G.pair!, next));
+      const prev = G.pair;
       G.pair = next;
+      setView((v) => pinch(v, sizeRef.current, prev, next));
       return;
     }
     const dist = Math.hypot(p.x - G.start.x, p.y - G.start.y);
@@ -285,7 +322,9 @@ export function Plan2D(): ReactElement {
         s.preview((doc) => updateOpening(doc, o.id, { offset: off }));
       }
     } else if (G.mode === 'pan') {
-      setView((v) => panBy(v, p.x - G.last.x, p.y - G.last.y));
+      const dx = p.x - G.last.x;
+      const dy = p.y - G.last.y;
+      setView((v) => panBy(v, dx, dy));
     }
     G.last = p;
   };
