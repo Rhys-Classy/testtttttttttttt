@@ -4,6 +4,8 @@
 //   dist/SYNDICATE-OS.html           complete page, opens straight from disk
 //   dist/syndicate-os.artifact.html  the same app without the <html>/<head>
 //                                    wrapper, for hosts that supply their own
+//   dist/syndicate-os.demo.html      as above, locked to the scripted demo: it
+//                                    can never call Claude or store anything
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -67,8 +69,12 @@ html,body,#root{height:100%}
 body{margin:0;background:#050505;color:#eaeaea;font-family:var(--font-inter),ui-sans-serif,system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 `;
 
-const head = `<title>SYNDICATE.OS</title>\n<style>${css.replaceAll("</style", "<\\/style")}${shell}</style>\n`;
+const styles = `<style>${css.replaceAll("</style", "<\\/style")}${shell}</style>\n`;
+const head = `<title>SYNDICATE.OS</title>\n${styles}`;
 const body = `<div id="root"></div>\n<script>${script}</script>\n`;
+// The demo copy sets one flag before the app starts. With it the dashboard
+// never looks for Claude or for storage, so it stays scripted wherever it is opened.
+const demo = `<title>SYNDICATE.OS Demo</title>\n${styles}<script>window.__SYNDICATE_DEMO__=true</script>\n${body}`;
 
 const icon = encodeURIComponent(readFileSync(path.join(root, "src/app/icon.svg"), "utf8"));
 const page = `<!doctype html>
@@ -89,6 +95,7 @@ mkdirSync(outDir, { recursive: true });
 const outputs = [
   ["SYNDICATE-OS.html", page],
   ["syndicate-os.artifact.html", head + body],
+  ["syndicate-os.demo.html", demo],
 ];
 for (const [name, content] of outputs) {
   writeFileSync(path.join(outDir, name), content);

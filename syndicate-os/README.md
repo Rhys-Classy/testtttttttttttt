@@ -28,6 +28,10 @@ Live mode drafts. It does not post, send or publish anything: the operator copie
 
 To publish it, run `npm run build:standalone` and publish `dist/syndicate-os.artifact.html` as an artifact with the capabilities `{ sample: {}, db: {}, user: {} }`.
 
+### Demo-only copy
+
+The same build also writes `dist/syndicate-os.demo.html`. It is locked to the scripted demo: it never asks its host for Claude or for storage, so it cannot go live wherever it is opened. Publish it with no capabilities when you want to show the deck without anything real behind it.
+
 ## Run it
 
 ```bash

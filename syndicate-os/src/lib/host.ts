@@ -82,10 +82,19 @@ export interface HostRuntime {
 declare global {
   interface Window {
     claude?: HostRuntime;
+    /** Set by the demo build. The dashboard then never looks for a host and stays scripted. */
+    __SYNDICATE_DEMO__?: boolean;
   }
+}
+
+/** True in the demo-only build, where nothing may go live whatever the page is opened in. */
+export function isDemoBuild(): boolean {
+  return typeof window !== "undefined" && window.__SYNDICATE_DEMO__ === true;
 }
 
 /** True when the page is running somewhere that might connect it to Claude. */
 export function hasHost(): boolean {
-  return typeof window !== "undefined" && typeof window.claude?.use === "function";
+  return (
+    !isDemoBuild() && typeof window !== "undefined" && typeof window.claude?.use === "function"
+  );
 }

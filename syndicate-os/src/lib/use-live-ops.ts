@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, type Dispatch } from "react";
 import { currentDirective } from "./engine";
 import { stamp } from "./format";
-import type { DocSnapshot, HostDb, SampleFn } from "./host";
+import { hasHost, type DocSnapshot, type HostDb, type SampleFn } from "./host";
 import { buildPrompt, countWords, splitTitle } from "./live";
 import { AGENT_IDS, PROFILES } from "./mock-data";
 import type {
@@ -85,8 +85,9 @@ export function useLiveOps(state: SyndicateState, dispatch: Dispatch<SyndicateAc
 
   // Ask the host for Claude and for storage, once.
   useEffect(() => {
-    const host = window.claude;
-    if (!host || typeof host.use !== "function") return;
+    // The demo build never asks, so it can never go live.
+    const host = hasHost() ? window.claude : undefined;
+    if (!host) return;
 
     let cancelled = false;
     let patience: ReturnType<typeof setTimeout> | undefined;

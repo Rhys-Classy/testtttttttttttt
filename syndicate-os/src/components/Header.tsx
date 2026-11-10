@@ -15,6 +15,8 @@ interface HeaderProps {
   mode: Mode;
   /** Live: true when the crew has not been told who it works for. */
   needsBrief: boolean;
+  /** The demo-only build, which is scripted by design. */
+  demo: boolean;
   onDeployAll: () => void;
   onRecallAll: () => void;
   onBrief: () => void;
@@ -43,6 +45,7 @@ export function Header({
   uptime,
   mode,
   needsBrief,
+  demo,
   onDeployAll,
   onRecallAll,
   onBrief,
@@ -95,7 +98,7 @@ export function Header({
               MODE[mode].tone,
             )}
           >
-            {MODE[mode].label}
+            {demo ? "DEMO" : MODE[mode].label}
           </p>
 
           <p

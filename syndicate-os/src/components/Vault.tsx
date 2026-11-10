@@ -10,6 +10,8 @@ interface VaultProps {
   agents: readonly Agent[];
   /** A plain-language warning about storage, when there is one. */
   note: string | null;
+  /** The demo-only build: scripted by design, with no route to going live. */
+  demo: boolean;
   onOpenDeliverable: (id: string) => void;
   onOpenLive: (id: AgentId) => void;
 }
@@ -46,18 +48,36 @@ function when(createdAt: number): string {
  * progress on top. In the simulation there is nothing real to list, so it says
  * so instead of showing pretend output.
  */
-export function Vault({ mode, deliverables, agents, note, onOpenDeliverable, onOpenLive }: VaultProps) {
+export function Vault({
+  mode,
+  deliverables,
+  agents,
+  note,
+  demo,
+  onOpenDeliverable,
+  onOpenLive,
+}: VaultProps) {
   if (mode !== "live") {
+    const [heading, body] = demo
+      ? [
+          "Demo mode",
+          "A scripted run for you to look over. Nothing here is live: no AI is called, nothing is saved and nothing is sent anywhere. The operatives are acting, and the numbers are made up.",
+        ]
+      : mode === "linking"
+        ? [
+            "Requesting Claude uplink",
+            "Checking whether this page can reach Claude. This takes a few seconds.",
+          ]
+        : [
+            "Simulation mode",
+            "This copy has no AI connection, so the operatives are acting out a script and nothing they report is real. Open SYNDICATE.OS through Claude and the same crew writes real work for your business.",
+          ];
     return (
       <section aria-label="Vault" className="border border-line bg-panel px-4 py-3">
         <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.25em] text-ink">
-          {mode === "linking" ? "Requesting Claude uplink" : "Simulation mode"}
+          {heading}
         </h2>
-        <p className="mt-1 max-w-[80ch] text-sm leading-6 text-mute">
-          {mode === "linking"
-            ? "Checking whether this page can reach Claude. This takes a few seconds."
-            : "This copy has no AI connection, so the operatives are acting out a script and nothing they report is real. Open SYNDICATE.OS through Claude and the same crew writes real work for your business."}
-        </p>
+        <p className="mt-1 max-w-[80ch] text-sm leading-6 text-mute">{body}</p>
       </section>
     );
   }

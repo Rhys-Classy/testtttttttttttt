@@ -12,6 +12,7 @@ import { TerminalLog } from "../components/TerminalLog";
 import { Vault } from "../components/Vault";
 import { statTiles } from "../lib/engine";
 import { formatNumber } from "../lib/format";
+import { isDemoBuild } from "../lib/host";
 import { briefReady } from "../lib/live";
 import { AGENT_IDS } from "../lib/mock-data";
 import type { AgentId, SyndicateState } from "../lib/types";
@@ -77,6 +78,7 @@ export default function Home() {
   const promptRef = useRef<HTMLInputElement>(null);
 
   const live = state.mode === "live";
+  const demo = isDemoBuild();
   const needsBrief = live && !briefReady(state.brief);
   const working = state.agents.filter((agent) => agent.status === "active").length;
   const configAgent =
@@ -152,6 +154,7 @@ export default function Home() {
           uptime={state.uptime}
           mode={state.mode}
           needsBrief={needsBrief}
+          demo={demo}
           onDeployAll={deployEveryone}
           onRecallAll={actions.recallAll}
           onBrief={openBrief}
@@ -189,6 +192,7 @@ export default function Home() {
               deliverables={state.deliverables}
               agents={state.agents}
               note={state.vaultNote}
+              demo={demo}
               onOpenDeliverable={openDeliverable}
               onOpenLive={openOutput}
             />
