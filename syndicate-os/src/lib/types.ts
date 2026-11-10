@@ -135,6 +135,8 @@ export interface SyndicateState {
   mode: Mode;
   /** True once the host has answered about Claude, either way. */
   linkSettled: boolean;
+  /** Live: what is doing the thinking, as shown in the header. Null in the simulation. */
+  engine: string | null;
   /** Why Claude cannot be used in this view, once it has refused. No further calls are made. */
   uplinkDenied: string | null;
   brief: BusinessBrief;
@@ -159,11 +161,15 @@ export type SyndicateAction =
   | { type: "ASSIGN"; id: AgentId; text: string; ts: string }
   | { type: "COMMAND"; raw: string; ts: string }
   | { type: "CLEAR_LOG"; ts: string }
-  | { type: "GO_LIVE"; ts: string; persistent: boolean }
+  /** A model is connected. Also sent when the operator swaps one model for another. */
+  | { type: "GO_LIVE"; ts: string; persistent: boolean; label: string }
+  /** The model was disconnected: back to the scripted demo. */
+  | { type: "GO_SIM"; ts: string }
   | { type: "LINK_FAILED"; ts: string }
   | { type: "JOB_TEXT"; id: AgentId; run: number; text: string }
   | { type: "JOB_DONE"; id: AgentId; run: number; deliverable: Deliverable; ts: string }
-  | { type: "JOB_FAILED"; id: AgentId; run: number; code: string; ts: string }
+  /** `detail` is the model's own words, shown when the code alone would not explain it. */
+  | { type: "JOB_FAILED"; id: AgentId; run: number; code: string; detail: string; ts: string }
   | { type: "VAULT_SYNC"; deliverables: Deliverable[] }
   | { type: "VAULT_NOTE"; note: string | null }
   | { type: "DELIVERABLE_SAVED"; id: string }

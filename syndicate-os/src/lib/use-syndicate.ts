@@ -5,6 +5,7 @@ import { INITIAL_STATE, reducer } from "./engine";
 import { stamp } from "./format";
 import { hasHost } from "./host";
 import { AGENT_IDS } from "./mock-data";
+import type { Connection } from "./providers";
 import type { AgentConfig, AgentId, AgentStatus, Rolls } from "./types";
 import { useLiveOps } from "./use-live-ops";
 
@@ -20,18 +21,20 @@ function roll(): Rolls {
 /**
  * Owns the dashboard state and everything that drives it. The first render is
  * the fixed demo data; the clock only starts once mounted in the browser, so
- * the server-rendered page and the first client render match. Opened through
- * Claude, the demo is swapped for live mode within a moment of loading.
+ * the server-rendered page and the first client render match. If a model is
+ * available (through Claude, or one the operator connected earlier) the demo
+ * is swapped for live mode within a moment of loading.
  */
 export function useSyndicate() {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
-  const { saveBrief, removeDeliverable } = useLiveOps(state, dispatch);
+  const { saveBrief, removeDeliverable, connect, restore } = useLiveOps(state, dispatch);
 
   useEffect(() => {
-    const bootTimer = setTimeout(
-      () => dispatch({ type: "BOOT", ts: stamp(), hasHost: hasHost() }),
-      BOOT_DELAY_MS,
-    );
+    const bootTimer = setTimeout(() => {
+      // Before the boot lines, so a restored model skips the simulation's greeting.
+      restore();
+      dispatch({ type: "BOOT", ts: stamp(), hasHost: hasHost() });
+    }, BOOT_DELAY_MS);
     const ticker = setInterval(
       () => dispatch({ type: "TICK", ts: stamp(), rolls: roll() }),
       TICK_MS,
@@ -40,7 +43,7 @@ export function useSyndicate() {
       clearTimeout(bootTimer);
       clearInterval(ticker);
     };
-  }, []);
+  }, [restore]);
 
   const actions = useMemo(
     () => ({
@@ -56,8 +59,10 @@ export function useSyndicate() {
       clearLog: () => dispatch({ type: "CLEAR_LOG", ts: stamp() }),
       saveBrief,
       removeDeliverable,
+      connectModel: (connection: Connection) => connect(connection),
+      disconnectModel: () => connect(null),
     }),
-    [saveBrief, removeDeliverable],
+    [saveBrief, removeDeliverable, connect],
   );
 
   return { state, actions };

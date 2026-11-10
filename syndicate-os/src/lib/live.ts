@@ -36,7 +36,7 @@ export function buildPrompt(
 ): string {
   const fact = (label: string, value: string) => `${label}: ${value.trim() || "(not given)"}`;
   return [
-    `You are ${profile.id}, the ${profile.role.toLowerCase()} operative on a small crew of AI agents working for the business described below. ${profile.remit}`,
+    `You are ${profile.id}, the ${profile.role} operative on a small crew of AI agents working for the business described below. ${profile.remit}`,
     "You are given one job. Hand back the finished work, ready to use as it is.",
     "",
     "BUSINESS BRIEF",
@@ -76,10 +76,37 @@ export function splitTitle(text: string, fallback: string): { title: string; bod
 
 /**
  * What to tell the operator when a job fails. `fatal` means Claude is off for
- * this view altogether, so the dashboard stops asking.
+ * this view altogether, so the dashboard stops asking. `detail` is the model's
+ * own wording, used only where the code alone would leave the operator guessing.
  */
-export function explainFailure(code: string): { message: string; fatal: boolean } {
+export function explainFailure(code: string, detail = ""): { message: string; fatal: boolean } {
   switch (code) {
+    case "bad_key":
+      return {
+        fatal: false,
+        message: "the model rejected the API key. Check it under MODEL, then deploy again",
+      };
+    case "bad_model":
+      return {
+        fatal: false,
+        message: "that model was not found at that address. Pick another under MODEL",
+      };
+    case "unreachable":
+      return {
+        fatal: false,
+        message:
+          "could not reach the model. Check the address under MODEL and, for a model on this computer, that the program running it is open",
+      };
+    case "billing":
+      return {
+        fatal: false,
+        message: "the model account has a billing problem. Check it with the provider",
+      };
+    case "bad_request":
+      return {
+        fatal: false,
+        message: `the model would not accept the request${detail ? `: ${detail.slice(0, 200)}` : ". Try another model under MODEL"}`,
+      };
     case "not_granted":
     case "sampling_disabled":
     case "not_declared":
@@ -93,7 +120,7 @@ export function explainFailure(code: string): { message: string; fatal: boolean 
     case "rate_limited":
       return {
         fatal: false,
-        message: "Claude is rate-limiting this page. Give it a minute, then deploy again",
+        message: "the model is rate-limiting requests. Give it a minute, then deploy again",
       };
     case "session_expired":
       return {
@@ -101,18 +128,18 @@ export function explainFailure(code: string): { message: string; fatal: boolean 
         message: "your Claude session has expired. Sign in again, then deploy",
       };
     case "refused":
-      return { fatal: false, message: "Claude declined this job. Reword it and deploy again" };
+      return { fatal: false, message: "the model declined this job. Reword it and deploy again" };
     case "empty_completion":
       return {
         fatal: false,
-        message: "Claude came back empty-handed. Give a more specific job and deploy again",
+        message: "the model came back empty-handed. Give a more specific job and deploy again",
       };
     case "prompt_too_large":
       return { fatal: false, message: "the brief is too long to send. Trim it in BRIEF" };
     default:
       return {
         fatal: false,
-        message: "the connection to Claude dropped before the job finished. Deploy again to retry",
+        message: "the connection to the model dropped before the job finished. Deploy again to retry",
       };
   }
 }

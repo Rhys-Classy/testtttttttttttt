@@ -7,12 +7,13 @@ import { BriefPanel } from "../components/BriefPanel";
 import { ConfigPanel } from "../components/ConfigPanel";
 import { DeliverablePanel, type ReaderView } from "../components/DeliverablePanel";
 import { Header } from "../components/Header";
+import { ModelPanel } from "../components/ModelPanel";
 import { StatStrip } from "../components/StatStrip";
 import { TerminalLog } from "../components/TerminalLog";
 import { Vault } from "../components/Vault";
 import { statTiles } from "../lib/engine";
 import { formatNumber } from "../lib/format";
-import { isDemoBuild } from "../lib/host";
+import { hasHost, isDemoBuild } from "../lib/host";
 import { briefReady } from "../lib/live";
 import { AGENT_IDS } from "../lib/mock-data";
 import type { AgentId, SyndicateState } from "../lib/types";
@@ -22,6 +23,7 @@ import { useSyndicate } from "../lib/use-syndicate";
 type Panel =
   | { kind: "config"; id: AgentId }
   | { kind: "brief" }
+  | { kind: "model" }
   | { kind: "deliverable"; id: string }
   /** Whatever this operative is writing now, or the last thing it finished. */
   | { kind: "output"; id: AgentId }
@@ -79,6 +81,8 @@ export default function Home() {
 
   const live = state.mode === "live";
   const demo = isDemoBuild();
+  // Opened through Claude the host supplies the model; the demo never has one.
+  const canConnect = !demo && !hasHost();
   const needsBrief = live && !briefReady(state.brief);
   const working = state.agents.filter((agent) => agent.status === "active").length;
   const configAgent =
@@ -109,6 +113,7 @@ export default function Home() {
   const openOutput = useCallback((id: AgentId) => setPanel({ kind: "output", id }), []);
   const openDeliverable = useCallback((id: string) => setPanel({ kind: "deliverable", id }), []);
   const openBrief = useCallback(() => setPanel({ kind: "brief" }), []);
+  const openModel = useCallback(() => setPanel({ kind: "model" }), []);
 
   const { toggleDeploy, deployAll } = actions;
   // With no brief on file there is nothing to write about, so ask for one first.
@@ -153,11 +158,14 @@ export default function Home() {
           total={state.agents.length}
           uptime={state.uptime}
           mode={state.mode}
+          engine={state.engine}
           needsBrief={needsBrief}
           demo={demo}
+          canConnect={canConnect}
           onDeployAll={deployEveryone}
           onRecallAll={actions.recallAll}
           onBrief={openBrief}
+          onModel={openModel}
         />
 
         <main className="grid-floor flex-1 overflow-y-auto overscroll-contain">
@@ -193,6 +201,7 @@ export default function Home() {
               agents={state.agents}
               note={state.vaultNote}
               demo={demo}
+              canConnect={canConnect}
               onOpenDeliverable={openDeliverable}
               onOpenLive={openOutput}
             />
@@ -227,6 +236,13 @@ export default function Home() {
         open={panel?.kind === "brief"}
         brief={state.brief}
         onSave={actions.saveBrief}
+        onClose={closePanel}
+      />
+      <ModelPanel
+        open={panel?.kind === "model"}
+        engine={live ? state.engine : null}
+        onConnect={actions.connectModel}
+        onDisconnect={actions.disconnectModel}
         onClose={closePanel}
       />
       <DeliverablePanel view={reader} onClose={closePanel} onDelete={actions.removeDeliverable} />

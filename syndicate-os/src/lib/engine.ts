@@ -90,6 +90,7 @@ export const INITIAL_STATE: SyndicateState = {
   booted: false,
   mode: "sim",
   linkSettled: false,
+  engine: null,
   uplinkDenied: null,
   brief: EMPTY_BRIEF,
   deliverables: [],
@@ -404,12 +405,13 @@ function jobFailed(
   id: AgentId,
   run: number,
   code: string,
+  detail: string,
   ts: string,
 ): SyndicateState {
   const agent = state.agents.find((candidate) => candidate.id === id);
   if (!agent || agent.status !== "active" || agent.run !== run) return state;
 
-  const { message, fatal } = explainFailure(code);
+  const { message, fatal } = explainFailure(code, detail);
   const stand = (operative: Agent): Agent => ({
     ...operative,
     status: "idle",
@@ -491,8 +493,8 @@ function boot(state: SyndicateState, ts: string, hasHost: boolean): SyndicateSta
       `${state.agents.length} operatives registered: ${count("active")} live, ${count("idle")} idle, ${count("offline")} dark`,
     ),
     { source: "HYPE_BEAST", level: "info", message: "initiated task sequence..." },
-    { source: "THE_SHADOW", level: "info", message: "secured 12 new emails" },
-    sys("warn", "simulation: this copy has no AI connection, so the work shown is pretend"),
+    { source: "THE_SHADOW", level: "info", message: "secured 12 new leads" },
+    sys("warn", "simulation: no model is connected, so the work shown is pretend"),
     sys("success", "operator console ready. Type 'help' or press / to take the wheel"),
   ]);
 }
@@ -547,8 +549,8 @@ function runCommand(state: SyndicateState, raw: string, ts: string): SyndicateSt
         sys(
           "info",
           live
-            ? "live: every job is written by Claude from your brief and filed in the vault"
-            : "simulation: open SYNDICATE.OS through Claude and the same commands do real work",
+            ? "live: every job is written by the connected model from your brief and filed in the vault"
+            : "simulation: connect a model and the same commands do real work",
         ),
       );
 
@@ -673,12 +675,20 @@ export function reducer(state: SyndicateState, action: SyndicateAction): Syndica
       return write({ ...state, log: [] }, action.ts, [sys("info", "feed flushed")]);
 
     case "GO_LIVE": {
-      if (state.mode === "live") return state;
+      if (state.mode === "live") {
+        // Already working: the operator swapped one model for another.
+        if (state.engine === action.label) return state;
+        return write({ ...state, engine: action.label, uplinkDenied: null }, action.ts, [
+          sys("success", `model switched. Now running on ${action.label}`),
+        ]);
+      }
       return write(
         {
           ...state,
           mode: "live",
           linkSettled: true,
+          engine: action.label,
+          uplinkDenied: null,
           agents: state.mode === "linking" ? state.agents : LIVE_AGENTS,
           vaultNote: action.persistent
             ? null
@@ -686,9 +696,17 @@ export function reducer(state: SyndicateState, action: SyndicateAction): Syndica
         },
         action.ts,
         [
-          sys("success", "Claude uplink established. Operatives now do real work"),
-          sys("info", "deploy an operative, or type: assign hype <any marketing job>"),
+          sys("success", `uplink established: ${action.label}. Operatives now do real work`),
+          sys("info", "deploy an operative, or type: assign shadow <any ads job>"),
         ],
+      );
+    }
+    case "GO_SIM": {
+      if (state.mode === "sim") return state;
+      return write(
+        { ...state, mode: "sim", engine: null, uplinkDenied: null, agents: INITIAL_AGENTS },
+        action.ts,
+        [sys("warn", "model disconnected. Back to the simulation, so the work shown is pretend")],
       );
     }
     case "LINK_FAILED": {
@@ -704,7 +722,7 @@ export function reducer(state: SyndicateState, action: SyndicateAction): Syndica
     case "JOB_DONE":
       return jobDone(state, action.id, action.run, action.deliverable, action.ts);
     case "JOB_FAILED":
-      return jobFailed(state, action.id, action.run, action.code, action.ts);
+      return jobFailed(state, action.id, action.run, action.code, action.detail, action.ts);
 
     case "VAULT_SYNC": {
       // The store is the record. Keep only local pieces it has not confirmed yet.

@@ -3,9 +3,17 @@
 import { useCallback, useEffect, useRef, type Dispatch } from "react";
 import { currentDirective } from "./engine";
 import { stamp } from "./format";
-import { hasHost, type DocSnapshot, type HostDb, type SampleFn } from "./host";
+import { hasHost, isFailure, type DocSnapshot, type HostDb, type SampleFn } from "./host";
 import { buildPrompt, countWords, splitTitle } from "./live";
+import { createLocalDb } from "./local-db";
 import { AGENT_IDS, PROFILES } from "./mock-data";
+import {
+  connectionLabel,
+  createSample,
+  loadConnection,
+  saveConnection,
+  type Connection,
+} from "./providers";
 import type {
   AgentId,
   BusinessBrief,
@@ -38,6 +46,14 @@ function toBrief(data: Record<string, unknown>): BusinessBrief {
   };
 }
 
+/** The brief built into this copy of the app, used until the operator saves their own. */
+function bundledBrief(): BusinessBrief | null {
+  const bundled = window.__SYNDICATE_BRIEF__;
+  if (typeof bundled !== "object" || bundled === null) return null;
+  const brief = toBrief(bundled as Record<string, unknown>);
+  return brief.name ? brief : null;
+}
+
 function toDeliverable(doc: DocSnapshot): Deliverable[] {
   const data = doc.data();
   if (!doc.exists || !data) return [];
@@ -61,17 +77,67 @@ function toDeliverable(doc: DocSnapshot): Deliverable[] {
 
 const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
+/** Follow the stored brief and the stored work. Returns the function that stops following. */
+function watchStore(db: HostDb, dispatch: Dispatch<SyndicateAction>): () => void {
+  const patience = setTimeout(() => {
+    dispatch({
+      type: "VAULT_NOTE",
+      note: "The vault has not answered yet, so saved work may be missing from this list for now.",
+    });
+  }, VAULT_PATIENCE_MS);
+
+  const stops = [
+    db.doc(BRIEF_PATH).onSnapshot(
+      (snap) => {
+        const data = snap.data();
+        const brief = snap.exists && data ? toBrief(data) : bundledBrief();
+        if (brief) dispatch({ type: "BRIEF_SET", brief, ts: stamp(), announce: false });
+      },
+      () => undefined,
+    ),
+    db
+      .collection(VAULT_PATH)
+      .orderBy("createdAt", "desc")
+      .limit(VAULT_WINDOW)
+      .onSnapshot(
+        (snap) => {
+          if (!snap.metadata.fromCache) {
+            clearTimeout(patience);
+            dispatch({ type: "VAULT_NOTE", note: null });
+          }
+          dispatch({ type: "VAULT_SYNC", deliverables: snap.docs.flatMap(toDeliverable) });
+        },
+        () => {
+          clearTimeout(patience);
+          dispatch({
+            type: "VAULT_NOTE",
+            note: "The vault stopped responding. New work stays on this page until it is closed, so copy what you want to keep.",
+          });
+        },
+      ),
+  ];
+
+  return () => {
+    clearTimeout(patience);
+    for (const stop of stops) stop();
+  };
+}
+
 /**
- * The side of live mode that touches the outside world. It asks the hosting
- * page for Claude and for storage, sends each deployed operative's job to
- * Claude, streams the draft back into the dashboard, and files finished work.
+ * The side of live mode that touches the outside world: it finds something to
+ * do the thinking, sends each deployed operative's job to it, streams the
+ * draft back into the dashboard, and files finished work.
  *
- * Outside a Claude-hosted page none of this runs and the dashboard stays in
- * its scripted demo.
+ * There are two ways to get a model. Opened through Claude, the hosting page
+ * supplies one along with storage. Anywhere else, the operator connects their
+ * own (any API, or a model running on this computer) and work is filed in
+ * this browser. With neither, the dashboard stays in its scripted demo.
  */
 export function useLiveOps(state: SyndicateState, dispatch: Dispatch<SyndicateAction>) {
   const sampleRef = useRef<SampleFn | null>(null);
   const dbRef = useRef<HostDb | null>(null);
+  /** Stops following the browser's own store, when that is the one in use. */
+  const stopLocalWatch = useRef<(() => void) | null>(null);
   /**
    * The call made for each operative's current job. An entry is only ever
    * replaced by a newer job or removed when the operative stops working. It is
@@ -83,15 +149,14 @@ export function useLiveOps(state: SyndicateState, dispatch: Dispatch<SyndicateAc
   /** Pieces already handed to the vault, so each is written once. */
   const filing = useRef(new Set<string>());
 
-  // Ask the host for Claude and for storage, once.
+  // Opened through Claude: ask the host for a model and for storage, once.
   useEffect(() => {
     // The demo build never asks, so it can never go live.
     const host = hasHost() ? window.claude : undefined;
     if (!host) return;
 
     let cancelled = false;
-    let patience: ReturnType<typeof setTimeout> | undefined;
-    const stops: (() => void)[] = [];
+    let stopWatch: (() => void) | undefined;
 
     Promise.all([host.use("sample"), host.use("db")])
       .then(([sample, db]) => {
@@ -102,47 +167,13 @@ export function useLiveOps(state: SyndicateState, dispatch: Dispatch<SyndicateAc
         }
         sampleRef.current = sample;
         dbRef.current = db;
-        dispatch({ type: "GO_LIVE", ts: stamp(), persistent: db !== null });
-        if (!db) return;
-
-        patience = setTimeout(() => {
-          dispatch({
-            type: "VAULT_NOTE",
-            note: "The vault has not answered yet, so saved work may be missing from this list for now.",
-          });
-        }, VAULT_PATIENCE_MS);
-
-        stops.push(
-          db.doc(BRIEF_PATH).onSnapshot(
-            (snap) => {
-              const data = snap.data();
-              if (snap.exists && data) {
-                dispatch({ type: "BRIEF_SET", brief: toBrief(data), ts: stamp(), announce: false });
-              }
-            },
-            () => undefined,
-          ),
-          db
-            .collection(VAULT_PATH)
-            .orderBy("createdAt", "desc")
-            .limit(VAULT_WINDOW)
-            .onSnapshot(
-              (snap) => {
-                if (!snap.metadata.fromCache) {
-                  clearTimeout(patience);
-                  dispatch({ type: "VAULT_NOTE", note: null });
-                }
-                dispatch({ type: "VAULT_SYNC", deliverables: snap.docs.flatMap(toDeliverable) });
-              },
-              () => {
-                clearTimeout(patience);
-                dispatch({
-                  type: "VAULT_NOTE",
-                  note: "The vault stopped responding. New work stays on this page until it is closed, so copy what you want to keep.",
-                });
-              },
-            ),
-        );
+        dispatch({
+          type: "GO_LIVE",
+          ts: stamp(),
+          persistent: db !== null,
+          label: "CLAUDE_UPLINK",
+        });
+        if (db) stopWatch = watchStore(db, dispatch);
       })
       .catch(() => {
         if (!cancelled) dispatch({ type: "LINK_FAILED", ts: stamp() });
@@ -150,12 +181,11 @@ export function useLiveOps(state: SyndicateState, dispatch: Dispatch<SyndicateAc
 
     return () => {
       cancelled = true;
-      clearTimeout(patience);
-      for (const stop of stops) stop();
+      stopWatch?.();
     };
   }, [dispatch]);
 
-  // Send each working operative's job to Claude exactly once, and stop the
+  // Send each working operative's job to the model exactly once, and stop the
   // call of any operative that has been pulled off its job.
   useEffect(() => {
     const sample = sampleRef.current;
@@ -213,17 +243,22 @@ export function useLiveOps(state: SyndicateState, dispatch: Dispatch<SyndicateAc
           });
         },
         (error: unknown) => {
-          const code =
-            typeof error === "object" && error !== null && "code" in error
-              ? String(error.code)
-              : "upstream_error";
+          const known = isFailure(error) ? error : null;
+          const code = known?.code ?? "upstream_error";
           // Stopping a job ourselves is not a failure to report.
           if (controller.signal.aborted || code === "cancelled") return;
-          dispatch({ type: "JOB_FAILED", id, run, code, ts: stamp() });
+          dispatch({
+            type: "JOB_FAILED",
+            id,
+            run,
+            code,
+            detail: known?.message ?? "",
+            ts: stamp(),
+          });
         },
       );
     }
-  }, [state.agents, state.mode, state.brief, dispatch]);
+  }, [state.agents, state.mode, state.brief, state.engine, dispatch]);
 
   // File finished work. Driven by the state, not by the call that produced it,
   // so only pieces the dashboard actually accepted are ever stored.
@@ -262,8 +297,49 @@ export function useLiveOps(state: SyndicateState, dispatch: Dispatch<SyndicateAc
     return () => {
       for (const call of made.values()) call.controller.abort();
       made.clear();
+      stopLocalWatch.current?.();
     };
   }, []);
+
+  /** Start using the operator's own model, swap it for another, or (null) let it go. */
+  const connect = useCallback(
+    (connection: Connection | null, remember = true) => {
+      if (hasHost()) return; // the hosting page already supplies the model
+      if (remember) saveConnection(connection);
+
+      // Whatever is in flight was asked of the old model. Stop it; a job still
+      // assigned is sent again to the new one.
+      for (const call of calls.current.values()) call.controller.abort();
+      calls.current.clear();
+
+      if (!connection) {
+        sampleRef.current = null;
+        dispatch({ type: "GO_SIM", ts: stamp() });
+        return;
+      }
+
+      sampleRef.current = createSample(connection);
+      if (!dbRef.current) {
+        const db = createLocalDb();
+        dbRef.current = db;
+        stopLocalWatch.current = watchStore(db, dispatch);
+      }
+      dispatch({
+        type: "GO_LIVE",
+        ts: stamp(),
+        persistent: true,
+        label: connectionLabel(connection),
+      });
+    },
+    [dispatch],
+  );
+
+  /** At start-up: pick the saved model back up, if the operator connected one before. */
+  const restore = useCallback(() => {
+    if (hasHost()) return;
+    const saved = loadConnection();
+    if (saved) connect(saved, false);
+  }, [connect]);
 
   const saveBrief = useCallback(
     (brief: BusinessBrief) => {
@@ -293,5 +369,5 @@ export function useLiveOps(state: SyndicateState, dispatch: Dispatch<SyndicateAc
     [dispatch],
   );
 
-  return { saveBrief, removeDeliverable };
+  return { saveBrief, removeDeliverable, connect, restore };
 }

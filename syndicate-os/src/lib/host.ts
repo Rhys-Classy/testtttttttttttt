@@ -84,7 +84,28 @@ declare global {
     claude?: HostRuntime;
     /** Set by the demo build. The dashboard then never looks for a host and stays scripted. */
     __SYNDICATE_DEMO__?: boolean;
+    /** Set by the build from brief.json: the business the crew works for until the operator changes it. */
+    __SYNDICATE_BRIEF__?: unknown;
   }
+}
+
+/** The page's own failure shape, shared by every way of reaching a model. */
+export interface ModelFailure {
+  code: string;
+  message: string;
+}
+
+export const failure = (code: string, message: string): ModelFailure => ({ code, message });
+
+export function isFailure(value: unknown): value is ModelFailure {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "code" in value &&
+    typeof value.code === "string" &&
+    "message" in value &&
+    typeof value.message === "string"
+  );
 }
 
 /** True in the demo-only build, where nothing may go live whatever the page is opened in. */

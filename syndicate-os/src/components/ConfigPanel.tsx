@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Send } from "lucide-react";
 import { cn } from "../lib/cn";
 import { CLOCK_RATE, currentDirective, upcomingDirectives } from "../lib/engine";
@@ -79,12 +79,16 @@ function Controls({
   const profile = PROFILES[agent.id];
   const live = mode !== "sim";
   const [directive, setDirective] = useState("");
+  const directiveInput = useRef<HTMLInputElement>(null);
 
   const transmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!directive.trim()) return;
     onAssign(agent.id, directive);
     setDirective("");
+    // The Transmit button disables itself now the box is empty. Put focus
+    // back in the box so the next job can be typed straight away.
+    directiveInput.current?.focus();
   };
 
   const now = currentDirective(agent, mode);
@@ -214,6 +218,7 @@ function Controls({
             </label>
             <input
               id="config-directive"
+              ref={directiveInput}
               value={directive}
               onChange={(event) => setDirective(event.target.value)}
               placeholder={live ? "e.g. Write 3 ads for our winter offer" : "e.g. Chase invoice 0931"}

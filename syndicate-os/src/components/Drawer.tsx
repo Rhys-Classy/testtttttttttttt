@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { cn } from "../lib/cn";
@@ -30,25 +30,40 @@ function Panel({ onClose, labelledBy, accent, wide, children }: Omit<DrawerProps
     return () => opener?.focus();
   }, []);
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      onClose();
-      return;
-    }
-    if (event.key !== "Tab" || !panelRef.current) return;
-    // Keep Tab inside the drawer while it is open.
-    const focusable = panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE);
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last?.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first?.focus();
-    }
-  };
+  // Keys are caught on the whole document, not on the panel. A button that
+  // disables itself after being pressed drops focus onto the page behind, and
+  // a listener on the panel alone would then never hear Escape or Tab again.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const panel = panelRef.current;
+      if (!panel) return;
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = panel.querySelectorAll<HTMLElement>(FOCUSABLE);
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (!panel.contains(active)) {
+        // Focus escaped the drawer: bring it back in.
+        event.preventDefault();
+        (event.shiftKey ? last : first)?.focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    // Capture phase, so the drawer answers before any page-wide shortcut.
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [onClose]);
 
   return (
     <motion.aside
@@ -56,7 +71,6 @@ function Panel({ onClose, labelledBy, accent, wide, children }: Omit<DrawerProps
       role="dialog"
       aria-modal="true"
       aria-labelledby={labelledBy}
-      onKeyDown={handleKeyDown}
       style={{ "--accent": accent } as CSSProperties}
       initial={{ x: "100%" }}
       animate={{ x: 0 }}

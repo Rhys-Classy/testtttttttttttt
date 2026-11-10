@@ -12,6 +12,8 @@ interface VaultProps {
   note: string | null;
   /** The demo-only build: scripted by design, with no route to going live. */
   demo: boolean;
+  /** True where the operator can plug in their own model. */
+  canConnect: boolean;
   onOpenDeliverable: (id: string) => void;
   onOpenLive: (id: AgentId) => void;
 }
@@ -54,6 +56,7 @@ export function Vault({
   agents,
   note,
   demo,
+  canConnect,
   onOpenDeliverable,
   onOpenLive,
 }: VaultProps) {
@@ -68,10 +71,15 @@ export function Vault({
             "Requesting Claude uplink",
             "Checking whether this page can reach Claude. This takes a few seconds.",
           ]
-        : [
-            "Simulation mode",
-            "This copy has no AI connection, so the operatives are acting out a script and nothing they report is real. Open SYNDICATE.OS through Claude and the same crew writes real work for your business.",
-          ];
+        : canConnect
+          ? [
+              "Simulation mode",
+              "No model is connected, so the operatives are acting out a script and nothing they report is real. Connect one under MODEL (any AI service you have a key for, or a model on this computer) and the same crew writes real work for your business.",
+            ]
+          : [
+              "Simulation mode",
+              "This view has no connection to a model, so the operatives are acting out a script and nothing they report is real.",
+            ];
     return (
       <section aria-label="Vault" className="border border-line bg-panel px-4 py-3">
         <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.25em] text-ink">

@@ -7,7 +7,7 @@
 //   dist/syndicate-os.demo.html      as above, locked to the scripted demo: it
 //                                    can never call Claude or store anything
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -71,10 +71,20 @@ body{margin:0;background:#050505;color:#eaeaea;font-family:var(--font-inter),ui-
 
 const styles = `<style>${css.replaceAll("</style", "<\\/style")}${shell}</style>\n`;
 const head = `<title>SYNDICATE.OS</title>\n${styles}`;
-const body = `<div id="root"></div>\n<script>${script}</script>\n`;
+const app = `<div id="root"></div>\n<script>${script}</script>\n`;
+
+// brief.json is the business this copy works for out of the box. It is the
+// starting point only: once the operator saves a brief of their own, theirs wins.
+const briefPath = path.join(root, "brief.json");
+const brief = existsSync(briefPath) ? JSON.parse(readFileSync(briefPath, "utf8")) : null;
+const briefScript = brief
+  ? `<script>window.__SYNDICATE_BRIEF__=${JSON.stringify(brief).replaceAll("<", "\\u003c")}</script>\n`
+  : "";
+const body = briefScript + app;
+
 // The demo copy sets one flag before the app starts. With it the dashboard
-// never looks for Claude or for storage, so it stays scripted wherever it is opened.
-const demo = `<title>SYNDICATE.OS Demo</title>\n${styles}<script>window.__SYNDICATE_DEMO__=true</script>\n${body}`;
+// never looks for a model or for storage, so it stays scripted wherever it is opened.
+const demo = `<title>SYNDICATE.OS Demo</title>\n${styles}<script>window.__SYNDICATE_DEMO__=true</script>\n${app}`;
 
 const icon = encodeURIComponent(readFileSync(path.join(root, "src/app/icon.svg"), "utf8"));
 const page = `<!doctype html>

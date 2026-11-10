@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, OctagonX, Zap } from "lucide-react";
+import { Cpu, FileText, OctagonX, Zap } from "lucide-react";
 import { cn } from "../lib/cn";
 import { formatDuration } from "../lib/format";
 import type { Mode } from "../lib/types";
@@ -13,23 +13,28 @@ interface HeaderProps {
   /** Seconds since boot. */
   uptime: number;
   mode: Mode;
+  /** Live: what is doing the thinking. */
+  engine: string | null;
   /** Live: true when the crew has not been told who it works for. */
   needsBrief: boolean;
   /** The demo-only build, which is scripted by design. */
   demo: boolean;
+  /** True where the operator can plug in their own model. */
+  canConnect: boolean;
   onDeployAll: () => void;
   onRecallAll: () => void;
   onBrief: () => void;
+  onModel: () => void;
 }
 
 const MODE: Record<Mode, { label: string; tone: string }> = {
   sim: { label: "SIMULATION", tone: "border-line text-mute" },
   linking: { label: "LINKING", tone: "border-line text-mute" },
-  live: { label: "CLAUDE_UPLINK", tone: "border-cyan/60 text-cyan" },
+  live: { label: "LIVE", tone: "border-cyan/60 text-cyan" },
 };
 
 const BUTTON =
-  "flex h-9 items-center gap-2 rounded-none border px-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.2em] transition-colors duration-75";
+  "flex h-9 shrink-0 items-center gap-2 rounded-none border px-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.2em] transition-colors duration-75";
 
 function systemMode(live: number, total: number) {
   if (live === 0) return { label: "DORMANT", tone: "border-line text-mute", dot: "bg-mute" };
@@ -44,14 +49,18 @@ export function Header({
   total,
   uptime,
   mode,
+  engine,
   needsBrief,
   demo,
+  canConnect,
   onDeployAll,
   onRecallAll,
   onBrief,
+  onModel,
 }: HeaderProps) {
   const clock = useClock();
   const system = systemMode(live, total);
+  const connected = mode === "live";
 
   return (
     <header className="relative z-30 shrink-0 border-b border-line bg-void">
@@ -69,12 +78,12 @@ export function Header({
             </GlitchText>
           </h1>
           <p className="mt-1.5 hidden font-mono text-[10px] uppercase leading-none tracking-[0.25em] text-mute sm:block">
-            Operative control <span aria-hidden>{"//"}</span> build 3.0
+            Prospects by paid ads <span aria-hidden>{"//"}</span> build 4.0
           </p>
         </div>
 
-        <div className="ml-auto flex items-center gap-2 md:gap-3">
-          <dl className="hidden items-center gap-5 font-mono text-[11px] uppercase tracking-[0.15em] 2xl:flex">
+        <div className="ml-auto flex min-w-0 items-center gap-2 md:gap-3">
+          <dl className="hidden items-center gap-5 font-mono text-[11px] uppercase tracking-[0.15em] min-[1800px]:flex">
             <div className="flex gap-2">
               <dt className="text-mute">Nodes</dt>
               <dd className="tabular-nums">
@@ -91,20 +100,22 @@ export function Header({
             </div>
           </dl>
 
-          {/* Whether the work on screen is real or scripted. */}
+          {/* Whether the work on screen is real or scripted, and what is doing it. */}
           <p
             className={cn(
-              "hidden h-9 items-center border px-2.5 font-mono text-[11px] font-semibold tracking-[0.2em] lg:flex",
+              "hidden h-9 min-w-0 max-w-[18rem] items-center border px-2.5 font-mono text-[11px] font-semibold tracking-[0.15em] lg:flex",
               MODE[mode].tone,
             )}
           >
-            {demo ? "DEMO" : MODE[mode].label}
+            <span className="truncate">
+              {demo ? "DEMO" : connected && engine ? engine : MODE[mode].label}
+            </span>
           </p>
 
           <p
             role="status"
             className={cn(
-              "flex h-9 items-center gap-2 border px-2.5 font-mono text-[11px] font-semibold tracking-[0.2em]",
+              "flex h-9 shrink-0 items-center gap-2 border px-2.5 font-mono text-[11px] font-semibold tracking-[0.2em]",
               system.tone,
             )}
           >
@@ -113,7 +124,23 @@ export function Header({
             <span className="sr-only sm:not-sr-only">SYS_{system.label}</span>
           </p>
 
-          {mode === "live" && (
+          {canConnect && (
+            <button
+              type="button"
+              onClick={onModel}
+              aria-label={connected ? "Change the model" : "Connect a model"}
+              className={cn(
+                BUTTON,
+                connected
+                  ? "border-acid/60 text-acid hover:bg-acid hover:text-void"
+                  : "animate-pulse-dot border-acid bg-acid text-void hover:bg-transparent hover:text-acid",
+              )}
+            >
+              <Cpu aria-hidden className="size-3.5" />
+              <span className="hidden md:inline">{connected ? "Model" : "Connect model"}</span>
+            </button>
+          )}
+          {connected && (
             <button
               type="button"
               onClick={onBrief}
@@ -136,7 +163,7 @@ export function Header({
             className={cn(BUTTON, "border-acid text-acid hover:bg-acid hover:text-void")}
           >
             <Zap aria-hidden className="size-3.5" fill="currentColor" />
-            <span className="hidden md:inline">Deploy all</span>
+            <span className="hidden xl:inline">Deploy all</span>
           </button>
           <button
             type="button"
@@ -145,7 +172,7 @@ export function Header({
             className={cn(BUTTON, "border-pink text-pink hover:bg-pink hover:text-void")}
           >
             <OctagonX aria-hidden className="size-3.5" />
-            <span className="hidden md:inline">Kill switch</span>
+            <span className="hidden xl:inline">Kill switch</span>
           </button>
         </div>
       </div>
