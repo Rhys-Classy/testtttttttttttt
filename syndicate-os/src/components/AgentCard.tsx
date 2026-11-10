@@ -13,20 +13,28 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "../lib/cn";
-import { MAX_STEP, upcomingDirectives } from "../lib/engine";
+import { MAX_STEP, currentDirective, upcomingDirectives } from "../lib/engine";
 import { formatNumber } from "../lib/format";
 import { ACCENTS, PROFILES } from "../lib/mock-data";
-import type { Agent, AgentId, AgentStatus } from "../lib/types";
+import type { Agent, AgentId, AgentStatus, Mode } from "../lib/types";
 import { useTypewriter } from "../lib/use-typewriter";
 import { GlitchText } from "./GlitchText";
 import { Sparkline } from "./Sparkline";
 
 interface AgentCardProps {
   agent: Agent;
+  mode: Mode;
   /** Number key that toggles this operative. */
   hotkey: number;
+  /** Live: pieces this operative has in the vault, and their combined length. */
+  delivered: number;
+  wordsWritten: number;
+  /** Live: title of its most recent piece, if it has one. */
+  lastTitle: string | null;
   onDeploy: (id: AgentId) => void;
   onConfigure: (id: AgentId) => void;
+  /** Live: open what this operative is writing, or the last thing it finished. */
+  onOutput: (id: AgentId) => void;
 }
 
 const ICONS: Record<AgentId, LucideIcon> = {
@@ -55,6 +63,8 @@ const STATUS: Record<AgentStatus, { label: string; badge: string; dot: string }>
 };
 
 const SEGMENTS = 24;
+const STAT_LABEL = "text-[10px] uppercase tracking-[0.15em] text-mute";
+const STAT_VALUE = "text-lg font-semibold tabular-nums leading-tight";
 
 function StatusBadge({ status }: { status: AgentStatus }) {
   const { label, badge, dot } = STATUS[status];
@@ -98,15 +108,36 @@ function SegmentBar({ value, active, label }: { value: number; active: boolean; 
   );
 }
 
-function AgentCardBase({ agent, hotkey, onDeploy, onConfigure }: AgentCardProps) {
+function AgentCardBase({
+  agent,
+  mode,
+  hotkey,
+  delivered,
+  wordsWritten,
+  lastTitle,
+  onDeploy,
+  onConfigure,
+  onOutput,
+}: AgentCardProps) {
   const profile = PROFILES[agent.id];
   const Icon = ICONS[agent.id];
+  const live = mode !== "sim";
   const active = agent.status === "active";
   const offline = agent.status === "offline";
   const percent = Math.min(100, Math.floor(agent.progress));
   const typed = useTypewriter(agent.task);
-  const [next] = upcomingDirectives(agent, 1);
+  // At rest, "next up" is the job a deploy would start. At work, it is the one after.
+  const next = active ? upcomingDirectives(agent, 1, mode)[0] : currentDirective(agent, mode);
   const titleId = `${agent.id}-name`;
+
+  // Live: Claude thinks in silence before the first words arrive.
+  const thinking = live && active && agent.draft === "";
+  const readout = thinking
+    ? "THINK"
+    : active || percent > 0
+      ? `${String(percent).padStart(2, "0")}%`
+      : "--";
+  const tail = agent.draft.replace(/\s+/g, " ").slice(-110);
 
   return (
     <motion.article
@@ -165,8 +196,8 @@ function AgentCardBase({ agent, hotkey, onDeploy, onConfigure }: AgentCardProps)
       <div className={cn("mt-4 border border-line bg-void p-3", offline && "hatch")}>
         <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.2em]">
           <span className={offline ? "text-accent/70" : "text-accent"}>CURRENT_DIRECTIVE</span>
-          <span className="tabular-nums text-mute">
-            {active || percent > 0 ? `${String(percent).padStart(2, "0")}%` : "--"}
+          <span className={cn("tabular-nums", thinking ? "animate-blink text-accent" : "text-mute")}>
+            {readout}
           </span>
         </div>
         <p
@@ -188,19 +219,41 @@ function AgentCardBase({ agent, hotkey, onDeploy, onConfigure }: AgentCardProps)
           )}
         </p>
         <SegmentBar value={percent} active={active} label={`${agent.id} directive progress`} />
+
+        {/* Live: a window onto the real output, the draft as it lands or the last piece filed. */}
+        {live && (
+          <button
+            type="button"
+            onClick={() => onOutput(agent.id)}
+            disabled={!active && !lastTitle}
+            aria-label={
+              active
+                ? `Watch ${agent.id} write`
+                : lastTitle
+                  ? `Open ${agent.id}'s last piece: ${lastTitle}`
+                  : `${agent.id} has not delivered anything yet`
+            }
+            className="mt-3 flex w-full items-baseline gap-2 rounded-none border-t border-line pt-2 text-left font-mono text-[11px] leading-4 text-mute transition-colors duration-75 enabled:hover:text-ink"
+          >
+            <span className={cn("shrink-0 font-semibold", active || lastTitle ? "text-accent" : "text-mute")}>
+              {active ? "WATCH" : "LAST"} <span aria-hidden>&rsaquo;</span>
+            </span>
+            <span className="min-w-0 flex-1 truncate">
+              {active ? tail || "thinking it through..." : (lastTitle ?? "nothing delivered yet")}
+            </span>
+          </button>
+        )}
       </div>
 
       <div className="mt-4 flex items-end gap-3">
         <dl className="grid flex-1 grid-cols-2 gap-3 font-mono">
           <div>
-            <dt className="text-[10px] uppercase tracking-[0.15em] text-mute">{profile.metricLabel}</dt>
-            <dd className="text-lg font-semibold tabular-nums leading-tight">
-              {formatNumber(agent.metric)}
-            </dd>
+            <dt className={STAT_LABEL}>{live ? "DELIVERED" : profile.metricLabel}</dt>
+            <dd className={STAT_VALUE}>{formatNumber(live ? delivered : agent.metric)}</dd>
           </div>
           <div>
-            <dt className="text-[10px] uppercase tracking-[0.15em] text-mute">DIRECTIVES</dt>
-            <dd className="text-lg font-semibold tabular-nums leading-tight">{agent.completed}</dd>
+            <dt className={STAT_LABEL}>{live ? "WORDS" : "DIRECTIVES"}</dt>
+            <dd className={STAT_VALUE}>{formatNumber(live ? wordsWritten : agent.completed)}</dd>
           </div>
         </dl>
         <Sparkline

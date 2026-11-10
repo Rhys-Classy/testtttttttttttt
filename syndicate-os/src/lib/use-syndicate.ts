@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useReducer } from "react";
 import { INITIAL_STATE, reducer } from "./engine";
 import { stamp } from "./format";
+import { hasHost } from "./host";
 import { AGENT_IDS } from "./mock-data";
 import type { AgentConfig, AgentId, AgentStatus, Rolls } from "./types";
+import { useLiveOps } from "./use-live-ops";
 
 const TICK_MS = 1000;
 const BOOT_DELAY_MS = 400;
@@ -16,15 +18,20 @@ function roll(): Rolls {
 }
 
 /**
- * Owns the dashboard state and the clock that drives it. The first render is
- * the fixed mock data; the simulation only starts ticking once mounted in the
- * browser, so the server-rendered page and the first client render match.
+ * Owns the dashboard state and everything that drives it. The first render is
+ * the fixed demo data; the clock only starts once mounted in the browser, so
+ * the server-rendered page and the first client render match. Opened through
+ * Claude, the demo is swapped for live mode within a moment of loading.
  */
 export function useSyndicate() {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
+  const { saveBrief, removeDeliverable } = useLiveOps(state, dispatch);
 
   useEffect(() => {
-    const bootTimer = setTimeout(() => dispatch({ type: "BOOT", ts: stamp() }), BOOT_DELAY_MS);
+    const bootTimer = setTimeout(
+      () => dispatch({ type: "BOOT", ts: stamp(), hasHost: hasHost() }),
+      BOOT_DELAY_MS,
+    );
     const ticker = setInterval(
       () => dispatch({ type: "TICK", ts: stamp(), rolls: roll() }),
       TICK_MS,
@@ -47,8 +54,10 @@ export function useSyndicate() {
       assign: (id: AgentId, text: string) => dispatch({ type: "ASSIGN", id, text, ts: stamp() }),
       command: (raw: string) => dispatch({ type: "COMMAND", raw, ts: stamp() }),
       clearLog: () => dispatch({ type: "CLEAR_LOG", ts: stamp() }),
+      saveBrief,
+      removeDeliverable,
     }),
-    [],
+    [saveBrief, removeDeliverable],
   );
 
   return { state, actions };
