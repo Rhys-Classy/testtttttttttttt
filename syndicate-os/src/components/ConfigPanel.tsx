@@ -137,7 +137,8 @@ function PanelBody({ agent, onClose, onStatus, onPatch, onAssign }: ConfigPanelP
       animate={{ x: 0 }}
       exit={{ x: "100%" }}
       transition={{ duration: 0.16, ease: [0.2, 0.8, 0.2, 1] }}
-      className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-accent bg-panel shadow-[-28px_0_70px_-30px_var(--accent)]"
+      // The env() padding keeps the header and footer clear of a phone's system bars.
+      className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-accent bg-panel pb-[env(safe-area-inset-bottom,0px)] pt-[env(safe-area-inset-top,0px)] shadow-[-28px_0_70px_-30px_var(--accent)]"
     >
       <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
         <div>

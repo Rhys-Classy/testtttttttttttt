@@ -31,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-void font-sans text-ink">{children}</body>
+      <body className="h-full bg-void font-sans text-ink">{children}</body>
     </html>
   );
 }

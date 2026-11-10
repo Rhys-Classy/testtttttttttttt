@@ -41,8 +41,10 @@ export default function Home() {
   }, [actions, configId]);
 
   return (
-    <div className="crt-scanline">
-      <div className="flex h-dvh flex-col overflow-hidden bg-void text-ink">
+    // Full height comes from html and body, not the viewport unit, so the deck
+    // also fits when it is hosted inside a padded or framed page.
+    <div className="crt-scanline h-full">
+      <div className="flex h-full flex-col overflow-hidden bg-void text-ink">
         <Header
           live={summary.live}
           total={summary.total}

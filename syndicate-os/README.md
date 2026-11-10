@@ -14,6 +14,14 @@ npm run dev      # http://localhost:3000
 
 `npm run build` makes the production build, `npm run start` serves it, `npm run lint` checks the code.
 
+### One file, no install
+
+```bash
+npm run build:standalone
+```
+
+writes `dist/SYNDICATE-OS.html`: the whole dashboard in a single file, with the script, styles and fonts inside it. Copy it to any computer and double-click it. It needs no Node, no server and no internet connection.
+
 ## What you can do
 
 | Action | How |

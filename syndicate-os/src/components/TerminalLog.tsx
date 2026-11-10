@@ -166,7 +166,7 @@ export function TerminalLog({ entries, onCommand, onClear, inputRef }: TerminalL
       aria-label="Operations feed"
       className="relative z-20 shrink-0 border-t border-cyan/60 bg-panel shadow-[0_-18px_40px_-28px_var(--color-cyan)]"
     >
-      <div className="flex items-center gap-2 border-b border-line px-3 py-2 md:gap-3 md:px-5">
+      <div className="flex items-center gap-2 border-b border-line px-4 py-2 md:gap-3 md:px-5">
         <Terminal aria-hidden className="size-3.5 shrink-0 text-cyan" />
         <h2 className="shrink-0 font-mono text-[11px] font-bold uppercase tracking-[0.25em] text-ink">
           <span className="hidden sm:inline">Syndicate://</span>feed
@@ -233,7 +233,7 @@ export function TerminalLog({ entries, onCommand, onClear, inputRef }: TerminalL
 
       <div className="relative">
         {collapsed ? (
-          <p className="truncate px-3 py-2 font-mono text-xs text-mute md:px-5">
+          <p className="truncate px-4 py-2 font-mono text-xs text-mute md:px-5">
             {latest ? (
               <>
                 &gt; [{latest.ts}]{" "}
@@ -253,7 +253,7 @@ export function TerminalLog({ entries, onCommand, onClear, inputRef }: TerminalL
             aria-live="off"
             aria-label="Operative activity"
             tabIndex={0}
-            className="h-28 overflow-y-auto overscroll-contain px-3 py-2 font-mono text-xs leading-5 sm:h-36 md:h-44 md:px-5 md:text-[13px]"
+            className="h-28 overflow-y-auto overscroll-contain px-4 py-2 font-mono text-xs leading-5 sm:h-36 md:h-44 md:px-5 md:text-[13px]"
           >
             {visible.length === 0 ? (
               <p className="text-mute">&gt; nothing on this channel yet</p>
@@ -296,7 +296,7 @@ export function TerminalLog({ entries, onCommand, onClear, inputRef }: TerminalL
 
       <form
         onSubmit={submit}
-        className="flex items-center gap-2 border-t border-line px-3 py-2 font-mono focus-within:bg-raised focus-within:shadow-[inset_2px_0_0_var(--color-acid)] md:px-5"
+        className="flex items-center gap-2 border-t border-line px-4 py-2 font-mono focus-within:bg-raised focus-within:shadow-[inset_2px_0_0_var(--color-acid)] md:px-5"
       >
         <label htmlFor="syndicate-prompt" className="shrink-0 text-xs text-acid md:text-[13px]">
           <span className="hidden sm:inline">operator@syndicate</span>
