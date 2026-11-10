@@ -1,5 +1,5 @@
 import { formatNumber } from "./format";
-import { briefReady, expectedChars, explainFailure } from "./live";
+import { briefReady, expectedChars, explainFailure, withPasted } from "./live";
 import {
   AGENT_IDS,
   EMPTY_BRIEF,
@@ -51,6 +51,9 @@ const CHATTER_CHANCE: Record<Verbosity, number> = { quiet: 0.05, normal: 0.18, l
 /** Live: characters written in a second that fill the work-rate chart to the top. */
 const CHARS_PER_STEP = 12;
 
+/** Longest paste a skill will take, in characters: room for a big export, short of any model's limit. */
+export const SKILL_INPUT_LIMIT = 40_000;
+
 const CONFIG_LABEL: Record<keyof AgentConfig, string> = {
   clock: "clock",
   verbosity: "verbosity",
@@ -65,6 +68,7 @@ export const COMMANDS = [
   { name: "boot", usage: "boot <operative|all>", about: "bring an offline node up to idle" },
   { name: "kill", usage: "kill <operative|all>", about: "take a node offline" },
   { name: "assign", usage: "assign <operative> <directive>", about: "inject a directive and deploy" },
+  { name: "skills", usage: "skills [operative]", about: "list what the crew can do" },
   { name: "clock", usage: "clock <operative> <1-5>", about: "set clock speed (simulation)" },
   { name: "brief", usage: "brief", about: "show who the crew is working for" },
   { name: "clear", usage: "clear", about: "flush the feed" },
@@ -452,6 +456,51 @@ function assign(state: SyndicateState, id: AgentId, raw: string, ts: string): Sy
   ]);
 }
 
+/** Live: put an operative on one of its skills now, with whatever the owner pasted for it. */
+function runSkill(
+  state: SyndicateState,
+  id: AgentId,
+  skillId: string,
+  input: string,
+  ts: string,
+): SyndicateState {
+  if (state.mode === "sim") {
+    return write(state, ts, [sys("warn", "skills need a connected model. This is the simulation")]);
+  }
+  const blocked = liveBlock(state);
+  if (blocked) return write(state, ts, [blocked]);
+
+  const skill = PROFILES[id].skills.find((candidate) => candidate.id === skillId);
+  if (!skill) return state;
+  const pasted = skill.input ? input.trim().slice(0, SKILL_INPUT_LIMIT) : "";
+  if (skill.input && !pasted) {
+    return write(state, ts, [
+      sys("error", `${skill.name} works on something you paste in. Add it and run again`),
+    ]);
+  }
+
+  const override: Directive = {
+    text: skill.text,
+    task: withPasted(skill.task, pasted),
+    words: skill.words,
+    done: "",
+    gain: 1,
+  };
+  const agents = replaceAgent(state, id, (agent) => ({
+    ...agent,
+    status: "active",
+    override,
+    task: skill.text,
+    progress: 0,
+    draft: "",
+    sampledChars: 0,
+    run: agent.run + 1,
+  }));
+  return write({ ...state, agents }, ts, [
+    { source: id, level: "success", message: `skill engaged: ${skill.name}` },
+  ]);
+}
+
 function patchConfig(
   state: SyndicateState,
   id: AgentId,
@@ -597,6 +646,33 @@ function runCommand(state: SyndicateState, raw: string, ts: string): SyndicateSt
       return assign(echoed, ids[0], text, ts);
     }
 
+    case "skills": {
+      if (!live) {
+        return reply(sys("info", "skills need a connected model. This is the simulation"));
+      }
+      const ids = resolveTargets(args[0]);
+      if (args[0] && !ids) return noMatch(args[0]);
+      if (!ids || ids.length !== 1) {
+        return reply(
+          ...AGENT_IDS.map((id) =>
+            sys(
+              "info",
+              `${id.padEnd(10)}  ${PROFILES[id].role.padEnd(13)}${PROFILES[id].skills.length} skills`,
+            ),
+          ),
+          sys("info", "type skills <operative> to list them. Open SKILLS on a card to run one"),
+        );
+      }
+      return reply(
+        ...PROFILES[ids[0]].skills.map((skill) =>
+          sys(
+            "info",
+            `${skill.core ? "core" : "    "}  ${skill.name}${skill.input ? "  (works on your data)" : ""}`,
+          ),
+        ),
+      );
+    }
+
     case "clock":
     case "speed": {
       if (live) {
@@ -669,6 +745,8 @@ export function reducer(state: SyndicateState, action: SyndicateAction): Syndica
       return patchConfig(state, action.id, action.patch, action.ts);
     case "ASSIGN":
       return assign(state, action.id, action.text, action.ts);
+    case "RUN_SKILL":
+      return runSkill(state, action.id, action.skill, action.input, action.ts);
     case "COMMAND":
       return runCommand(state, action.raw, action.ts);
     case "CLEAR_LOG":

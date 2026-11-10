@@ -4,6 +4,7 @@ import { memo, type CSSProperties } from "react";
 import { motion } from "framer-motion";
 import {
   Landmark,
+  ListChecks,
   Megaphone,
   Play,
   Radar,
@@ -33,6 +34,8 @@ interface AgentCardProps {
   lastTitle: string | null;
   onDeploy: (id: AgentId) => void;
   onConfigure: (id: AgentId) => void;
+  /** Live: open the list of everything this operative can do. */
+  onSkills: (id: AgentId) => void;
   /** Live: open what this operative is writing, or the last thing it finished. */
   onOutput: (id: AgentId) => void;
 }
@@ -63,6 +66,8 @@ const STATUS: Record<AgentStatus, { label: string; badge: string; dot: string }>
 };
 
 const SEGMENTS = 24;
+const SIDE_BUTTON =
+  "flex h-11 shrink-0 items-center justify-center gap-2 rounded-none border border-line px-3 font-mono text-xs font-bold uppercase tracking-[0.2em] text-ink transition-colors duration-75 hover:border-accent hover:text-accent";
 const STAT_LABEL = "text-[10px] uppercase tracking-[0.15em] text-mute";
 const STAT_VALUE = "text-lg font-semibold tabular-nums leading-tight";
 
@@ -117,6 +122,7 @@ function AgentCardBase({
   lastTitle,
   onDeploy,
   onConfigure,
+  onSkills,
   onOutput,
 }: AgentCardProps) {
   const profile = PROFILES[agent.id];
@@ -291,15 +297,29 @@ function AgentCardBase({
             {hotkey}
           </kbd>
         </motion.button>
+        {/* Skills only exist where there is a model to run them. */}
+        {mode === "live" && (
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.97 }}
+            onClick={() => onSkills(agent.id)}
+            aria-label={`Skills for ${agent.id}`}
+            className={SIDE_BUTTON}
+          >
+            <ListChecks aria-hidden className="size-3.5" />
+            <span>Skills</span>
+          </motion.button>
+        )}
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}
           onClick={() => onConfigure(agent.id)}
           aria-label={`Configure ${agent.id}`}
-          className="flex h-11 items-center justify-center gap-2 rounded-none border border-line px-3 font-mono text-xs font-bold uppercase tracking-[0.2em] text-ink transition-colors duration-75 hover:border-accent hover:text-accent"
+          className={SIDE_BUTTON}
         >
           <Settings2 aria-hidden className="size-3.5" />
-          <span>Configure</span>
+          {/* With three buttons on the row the gear stands alone; its label is still read out. */}
+          {mode !== "live" && <span>Configure</span>}
         </motion.button>
       </div>
     </motion.article>

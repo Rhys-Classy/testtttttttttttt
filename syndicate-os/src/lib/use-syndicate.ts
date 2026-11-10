@@ -55,6 +55,8 @@ export function useSyndicate() {
       patchConfig: (id: AgentId, patch: Partial<AgentConfig>) =>
         dispatch({ type: "PATCH_CONFIG", id, patch, ts: stamp() }),
       assign: (id: AgentId, text: string) => dispatch({ type: "ASSIGN", id, text, ts: stamp() }),
+      runSkill: (id: AgentId, skill: string, input: string) =>
+        dispatch({ type: "RUN_SKILL", id, skill, input, ts: stamp() }),
       command: (raw: string) => dispatch({ type: "COMMAND", raw, ts: stamp() }),
       clearLog: () => dispatch({ type: "CLEAR_LOG", ts: stamp() }),
       saveBrief,

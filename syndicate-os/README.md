@@ -47,11 +47,27 @@ Where the Claude preset uses a model that supports it, a declined request is han
 ## Real work
 
 - **Brief.** The crew works from one business brief: name, what it sells, where, ideal customer, why customers choose it, tone, and any facts worth using. `brief.json` is the brief this copy starts with; the operator's own saved brief replaces it. Nothing runs until there is a name and what the business sells.
-- **Jobs.** Each operative has four real jobs. Deploy starts the next one.
+- **Skills.** Each operative has four core skills and five or six more it runs on demand: 39 across the crew. Deploy works through the core four in order. **Skills** on a card runs any of them on the spot.
+- **Your own data.** Skills marked *needs your data* work on whatever you paste in: a table copied out of Google Ads or Ads Manager, an enquiry, a landing page, a month's numbers. Until the app is connected to the ad accounts, this is how the crew sees real results. The paste is fenced and labelled as material, so text inside it is analysed and never followed as an instruction.
 - **Any job you like.** `assign shadow Write 5 more headlines about same-week callouts` hands that operative the job in your own words.
 - **Vault.** Finished work is listed under the crew, newest first. Open a piece to read it, copy it or delete it. It is kept across restarts.
 - **No invented facts.** Every job tells the model to use only what the brief says and to leave a `[PLACEHOLDER]` where a price, phone number or guarantee is needed but missing. Jobs that would need live data, such as search volumes, say so and do not guess.
 - **Usage.** Each job is one call to the model. Auto-requeue is off to begin with, so one deploy is one job. Switched on, it runs to the end of the operative's list and stops. Nothing loops or retries by itself.
+
+## Skills
+
+Core skills are in bold. The rest are on demand; *(data)* marks the ones that work on something pasted in.
+
+| Operative | Skills |
+| --- | --- |
+| HYPE_BEAST, Meta Ads | **Lead campaign build**, **5 ads**, **Lead form**, **Retargeting**, Performance review *(data)*, Creative test plan, 20 hooks, Audience ideas, Ad policy check *(data)*, Refresh a tired ad *(data)* |
+| THE_SHADOW, Google Ads | **Search campaign build**, **Keywords and negatives**, **Responsive search ads**, **Lead tracking setup**, Account audit *(data)*, Search terms clean-up *(data)*, Weekly review *(data)*, Quality Score fixes *(data)*, Landing page check *(data)*, Competitor ad teardown *(data)* |
+| THE_FIXER, Lead Quality | **Prospect scorecard**, **5-minute first response**, **7-day follow-up**, **Discovery call script**, Triage a lead *(data)*, Answer an objection *(data)*, Call prep *(data)*, Wake up old leads, Proposal follow-up, No-show recovery |
+| THE_BANKER, Budget & ROI | **Budget and lead targets**, **Kill-and-scale rules**, **Monthly report template**, **What a prospect is worth**, Write this month's report *(data)*, Cost per lead check *(data)*, Budget scenarios *(data)*, Google vs Meta *(data)*, Client results email *(data)* |
+
+They cover the same ground as the ad, lead and reporting skills Claude itself can be given (account audits, search-term and wasted-spend reviews, weekly and monthly reporting, ad copy, lead triage, objection handling, follow-up), written fresh for this app. The difference is where the data comes from: Claude's connected skills read an ad account directly, and these work on what the owner pastes in.
+
+To add or change a skill, edit `src/lib/skills.ts`. A skill is a name, a one-line promise, the instruction for the model, a word ceiling, and optionally a label for the paste box.
 
 ## Run it
 
@@ -85,7 +101,8 @@ writes three files to `dist/`:
 | Wake or stop the whole crew | **Deploy all** and **Kill switch** in the header |
 | Connect or change the model | **Model** in the header |
 | Change who the crew works for | **Brief** in the header |
-| Tune an operative | **Configure**: power state, auto-requeue, inject a job |
+| Run one skill now | **Skills** on a card (live only) |
+| Tune an operative | **Configure** (the gear, when live): power state, auto-requeue, inject a job |
 | Drive it from the keyboard | Press `/` and type. `Tab` completes, `↑` recalls history |
 | Read back through the feed | Scroll up. It holds position and counts what you are missing |
 
@@ -99,6 +116,7 @@ recall <operative|all>          pull an operative back to idle
 boot <operative|all>            bring an offline node up to idle
 kill <operative|all>            take a node offline
 assign <operative> <directive>  inject a directive and deploy
+skills [operative]              list what the crew can do
 clock <operative> <1-5>         set clock speed (simulation)
 brief                           show who the crew is working for
 clear                           flush the feed
@@ -122,6 +140,7 @@ src/
     TerminalLog.tsx       the feed: auto-scroll, filters, command line
     Vault.tsx             the list of finished work
     DeliverablePanel.tsx  reader for one piece, finished or still being written
+    SkillsPanel.tsx       one operative's skills, with a paste box for the ones that need data
     ModelPanel.tsx        connect a model: any API, or one on this computer
     BriefPanel.tsx        the business brief form
     ConfigPanel.tsx       settings for one operative
@@ -129,7 +148,8 @@ src/
     GlitchText.tsx        Framer Motion text tear, rolled fresh on every hover
     Header.tsx  StatStrip.tsx  Sparkline.tsx  BootOverlay.tsx
   lib/
-    mock-data.ts      the four operatives: scripted playbooks and real job lists
+    mock-data.ts      the four operatives and their scripted playbooks
+    skills.ts         the 39 real skills: what each asks the model for
     engine.ts         one pure reducer for every mode, plus the command parser
     live.ts           builds the instructions sent to the model; explains failures
     providers.ts      model connections: presets, storage, the chat-completions format
@@ -147,7 +167,7 @@ All behaviour lives in `engine.ts` as a pure reducer. The buttons, the hotkeys a
 
 Every way of reaching a model is reduced to one function shape (ask a question, stream the answer, report a coded failure), and every store to one document interface. The engine never knows which is behind them, which is what lets the same app run from a file, in Claude, and later as a desktop program.
 
-To change the jobs, edit `mock-data.ts`. To change what the model is told, edit `buildPrompt` in `live.ts`. To add a connection preset, add it to `PRESETS` in `providers.ts`.
+To change the skills, edit `skills.ts`. To change the rules every skill runs under, edit `buildPrompt` in `live.ts`. To add a connection preset, add it to `PRESETS` in `providers.ts`.
 
 ## Not built yet
 

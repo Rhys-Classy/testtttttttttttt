@@ -1,3 +1,4 @@
+import { SKILLS } from "./skills";
 import type { AccentKey, Agent, AgentId, AgentProfile, BusinessBrief, Directive } from "./types";
 
 export const ACCENTS: Record<AccentKey, { hex: string; label: string }> = {
@@ -28,20 +29,17 @@ export const EMPTY_BRIEF: BusinessBrief = {
   facts: "",
 };
 
-/** A real job: what the card shows, what the model is asked for, and how long it may run. */
-const job = (text: string, words: number, task: string): Directive => ({
-  text,
-  task,
-  words,
-  done: "",
-  gain: 1,
-});
+/** An operative's core skills, as the jobs Deploy works through in order. */
+const jobsOf = (id: AgentId): Directive[] =>
+  SKILLS[id]
+    .filter((skill) => skill.core)
+    .map((skill) => ({ text: skill.text, task: skill.task, words: skill.words, done: "", gain: 1 }));
 
 /**
  * The crew does one thing: bring in solid prospects with paid ads. Two
  * operatives run the channels (Meta, Google), one keeps the leads good, and
  * one watches the money. Each has a scripted playbook for the simulation and
- * a list of real jobs for when a model is connected.
+ * a set of real skills (in skills.ts) for when a model is connected.
  */
 export const PROFILES: Record<AgentId, AgentProfile> = {
   HYPE_BEAST: {
@@ -91,28 +89,8 @@ export const PROFILES: Record<AgentId, AgentProfile> = {
     ],
     remit:
       "Your field is Facebook and Instagram advertising: campaigns that bring in enquiries from the right people.",
-    jobs: [
-      job(
-        "Building the Meta lead campaign...",
-        650,
-        "Design a Meta (Facebook and Instagram) lead generation campaign, ready to build in Ads Manager. Give: CAMPAIGN (objective, buying type, and budget approach using [DAILY BUDGET]), then 3 AD SETS, each with a different audience: who it targets, locations, age range, detailed targeting or lookalike source, placements, and why this audience is worth testing. Finish with LAUNCH SETTINGS: optimisation event, attribution setting, schedule, and the 3 mistakes that most often waste money on a first lead campaign.",
-      ),
-      job(
-        "Writing 5 Meta ads...",
-        650,
-        "Write 5 Meta ads for a lead campaign, each built on a different angle: the problem, the result, proof, an objection answered, and a direct offer. For each ad give: ANGLE, PRIMARY TEXT (under 90 words, and the first line must stop the scroll), HEADLINE (under 8 words), DESCRIPTION (one line), BUTTON (the call-to-action to pick), and CREATIVE (what the image or short video should show, described so someone could make it).",
-      ),
-      job(
-        "Designing the lead form...",
-        500,
-        "Design a Meta instant form that screens for serious prospects, using the higher-intent form type. Give: INTRO (headline and two lines), QUESTIONS (5 at most: contact details plus the 2 or 3 qualifying questions that best separate a solid prospect from a time-waster, with answer options where multiple choice works), PRIVACY (a one-line placeholder for the privacy policy link), and THANK-YOU SCREEN (headline, what happens next, button). Say in two lines why each qualifying question is there.",
-      ),
-      job(
-        "Planning retargeting...",
-        500,
-        "Plan a Meta retargeting campaign for people who showed interest but did not enquire. Give: 3 AUDIENCES (who, the time window, and why), then one ad for each with PRIMARY TEXT, HEADLINE and BUTTON, written to pick up where their interest left off. Finish with BUDGET (as a share of [DAILY BUDGET]) and FREQUENCY (how often is too often, and what to do when it gets there).",
-      ),
-    ],
+    skills: SKILLS.HYPE_BEAST,
+    jobs: jobsOf("HYPE_BEAST"),
   },
   THE_SHADOW: {
     id: "THE_SHADOW",
@@ -161,28 +139,8 @@ export const PROFILES: Record<AgentId, AgentProfile> = {
     ],
     remit:
       "Your field is Google Ads search campaigns: showing up when someone is actively looking, and paying only for the searches worth having.",
-    jobs: [
-      job(
-        "Building the Google Search campaign...",
-        650,
-        "Design a Google Ads search campaign, ready to build. Give: CAMPAIGN SETTINGS (goal, networks to switch off, locations, language, schedule, the bidding strategy to start on, and budget using [DAILY BUDGET]), then 3 AD GROUPS organised by what the searcher wants, each with its theme and the page it should send people to using [LANDING PAGE]. Finish with SETTINGS THAT LEAK MONEY: the defaults to change before launch, and why.",
-      ),
-      job(
-        "Choosing keywords and negatives...",
-        700,
-        "Build the keyword plan for a Google search campaign with 3 ad groups. For each ad group give 10 to 12 KEYWORDS with match type (phrase or exact), chosen for buying intent, not curiosity. Then give a shared NEGATIVE KEYWORD LIST of 40 terms that block job seekers, do-it-yourself searchers, freebie hunters and irrelevant meanings. Do not quote search volumes or costs per click: you do not have that data.",
-      ),
-      job(
-        "Writing responsive search ads...",
-        700,
-        "Write a responsive search ad for each of 3 ad groups. For each give 15 HEADLINES of 30 characters or fewer and 4 DESCRIPTIONS of 90 characters or fewer, with the character count in brackets after each. Spread the headlines across what is offered, the location, proof, the offer and the call to action. Then give 4 SITELINKS (title and two description lines), 6 CALLOUTS and one STRUCTURED SNIPPET.",
-      ),
-      job(
-        "Setting up lead tracking...",
-        550,
-        "Write the conversion tracking plan for a business that wants enquiries and booked calls from Google Ads. Give: WHAT COUNTS AS A LEAD (the primary conversions, and what should be secondary), HOW TO SET IT UP (step by step in plain words: form submissions, phone calls from ads, calls from the website), HOW TO TEST IT (prove one real enquiry is counted once), and a PRE-LAUNCH CHECKLIST of 10 items to tick off before the campaign goes live.",
-      ),
-    ],
+    skills: SKILLS.THE_SHADOW,
+    jobs: jobsOf("THE_SHADOW"),
   },
   THE_FIXER: {
     id: "THE_FIXER",
@@ -231,28 +189,8 @@ export const PROFILES: Record<AgentId, AgentProfile> = {
     ],
     remit:
       "Your field is lead quality: sorting solid prospects from time-wasters and getting the good ones onto a call fast.",
-    jobs: [
-      job(
-        "Building the prospect scorecard...",
-        500,
-        "Build a scorecard for judging an incoming lead in under a minute. Give: WHAT A SOLID PROSPECT LOOKS LIKE (5 signals), RED FLAGS (5 signs of a time-waster), a SCORING TABLE in plain text (criterion, and what scores 0, 1 and 2), SCORE BANDS (hot, warm, pass, and what to do with each), and the 5 QUALIFYING QUESTIONS to ask on first contact, in the order to ask them.",
-      ),
-      job(
-        "Writing the 5-minute first response...",
-        450,
-        "Write what gets sent to a new lead within five minutes of their enquiry: a TEXT MESSAGE (under 50 words), an EMAIL (subject and body, under 120 words), and a CALL SCRIPT for the first phone call (the opening line, the qualifying questions woven in naturally, and how to book the next step). Each one names the next step and makes it easy to say yes.",
-      ),
-      job(
-        "Writing the 7-day follow-up...",
-        550,
-        "Write a 7-day follow-up for a lead who enquired and then went quiet. Give 6 touches mixing text, email and one phone call. For each: DAY, CHANNEL and the MESSAGE in full. Each touch adds something new: a proof point, an answer to a likely objection, or a simpler next step. The last one is a polite close-the-file message that leaves the door open.",
-      ),
-      job(
-        "Scripting the discovery call...",
-        600,
-        "Write the script for a 15-minute discovery call with a qualified prospect. Give: OPENING (set the agenda in two sentences), DISCOVERY QUESTIONS (8, in order, each with what a good answer sounds like), HOW TO PRESENT THE OFFER (three sentences tied to what they just said), HANDLING THE 3 MOST LIKELY OBJECTIONS, and THE CLOSE (how to ask for the next step, and what to send afterwards).",
-      ),
-    ],
+    skills: SKILLS.THE_FIXER,
+    jobs: jobsOf("THE_FIXER"),
   },
   THE_BANKER: {
     id: "THE_BANKER",
@@ -301,28 +239,8 @@ export const PROFILES: Record<AgentId, AgentProfile> = {
     ],
     remit:
       "Your field is the money side of advertising: budgets, cost per lead, and knowing what to cut and what to scale.",
-    jobs: [
-      job(
-        "Setting the ad budget and lead targets...",
-        600,
-        "Build the budget plan for running Google and Meta ads together, using [MONTHLY AD BUDGET]. Give: THE SPLIT (percentages for Google search, Meta prospecting and Meta retargeting, with one line of reasoning each), THE MATHS as simple formulas using [AVERAGE SALE VALUE], [GROSS MARGIN %] and [CLOSE RATE %] to work out the most a lead can cost and still be worth it, and THE FIRST 30 DAYS (what to expect while campaigns learn, and what not to touch). Do not invent the business's figures. You may add one worked example with round numbers, clearly labelled as an example.",
-      ),
-      job(
-        "Writing the weekly kill-and-scale rules...",
-        550,
-        "Write the rules for a 20-minute weekly ads review. Give: THE 6 NUMBERS TO PULL from Google Ads and Meta Ads Manager and where to find each, KILL RULES (plain if-then rules for pausing a keyword, an ad or an ad set, with thresholds given as multiples of [TARGET COST PER LEAD]), SCALE RULES (when to raise a budget and by how much), and WHAT TO LEAVE ALONE. Finish with a one-page checklist version.",
-      ),
-      job(
-        "Building the monthly results report...",
-        500,
-        "Build a monthly ad results report the owner can fill in in ten minutes. Give: HEADLINE NUMBERS (spend, leads, cost per lead, booked calls, sales, return on ad spend, each with its formula), BY CHANNEL (the same for Google and for Meta), WHAT WORKED, WHAT DID NOT, and NEXT MONTH'S PLAN (three actions). Use a square-bracket placeholder for every figure.",
-      ),
-      job(
-        "Costing a solid prospect...",
-        500,
-        "Write a plain-English guide to what a solid prospect is worth to this business. Show, with formulas and placeholders, how to get from [AVERAGE SALE VALUE] and [CLOSE RATE %] to the value of one lead, one booked call and one sale, and how lead quality changes the answer: compare a cheap lead that rarely buys with a dearer one that often does. Finish with THE ONE NUMBER TO WATCH each week, and why.",
-      ),
-    ],
+    skills: SKILLS.THE_BANKER,
+    jobs: jobsOf("THE_BANKER"),
   },
 };
 

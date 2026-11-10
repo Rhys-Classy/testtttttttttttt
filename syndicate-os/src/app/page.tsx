@@ -8,6 +8,7 @@ import { ConfigPanel } from "../components/ConfigPanel";
 import { DeliverablePanel, type ReaderView } from "../components/DeliverablePanel";
 import { Header } from "../components/Header";
 import { ModelPanel } from "../components/ModelPanel";
+import { SkillsPanel } from "../components/SkillsPanel";
 import { StatStrip } from "../components/StatStrip";
 import { TerminalLog } from "../components/TerminalLog";
 import { Vault } from "../components/Vault";
@@ -22,6 +23,7 @@ import { useSyndicate } from "../lib/use-syndicate";
 /** The one drawer that can be open. */
 type Panel =
   | { kind: "config"; id: AgentId }
+  | { kind: "skills"; id: AgentId }
   | { kind: "brief" }
   | { kind: "model" }
   | { kind: "deliverable"; id: string }
@@ -110,6 +112,7 @@ export default function Home() {
 
   const closePanel = useCallback(() => setPanel(null), []);
   const openConfig = useCallback((id: AgentId) => setPanel({ kind: "config", id }), []);
+  const openSkills = useCallback((id: AgentId) => setPanel({ kind: "skills", id }), []);
   const openOutput = useCallback((id: AgentId) => setPanel({ kind: "output", id }), []);
   const openDeliverable = useCallback((id: string) => setPanel({ kind: "deliverable", id }), []);
   const openBrief = useCallback(() => setPanel({ kind: "brief" }), []);
@@ -187,6 +190,7 @@ export default function Home() {
                         lastTitle={filed?.last ?? null}
                         onDeploy={deploy}
                         onConfigure={openConfig}
+                        onSkills={openSkills}
                         onOutput={openOutput}
                       />
                     </li>
@@ -236,6 +240,11 @@ export default function Home() {
         open={panel?.kind === "brief"}
         brief={state.brief}
         onSave={actions.saveBrief}
+        onClose={closePanel}
+      />
+      <SkillsPanel
+        agentId={panel?.kind === "skills" ? panel.id : null}
+        onRun={actions.runSkill}
         onClose={closePanel}
       />
       <ModelPanel

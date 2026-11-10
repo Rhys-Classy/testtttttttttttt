@@ -29,6 +29,27 @@ export interface Directive {
   words?: number;
 }
 
+/**
+ * One thing an operative knows how to do when the work is real. Core skills
+ * run in order when the operative is deployed. The rest are run on demand.
+ */
+export interface Skill {
+  /** Stable name for commands and storage, e.g. "google-search-terms". */
+  id: string;
+  name: string;
+  /** One line on what the owner gets back. */
+  about: string;
+  /** What the card shows while the operative is on it. */
+  text: string;
+  /** The full instruction handed to the model. */
+  task: string;
+  /** Rough word ceiling for the finished piece. */
+  words: number;
+  core: boolean;
+  /** Set when the skill works on something the owner pastes in. */
+  input?: { label: string; placeholder: string };
+}
+
 export interface AgentConfig {
   clock: ClockSpeed;
   verbosity: Verbosity;
@@ -52,7 +73,9 @@ export interface AgentProfile {
   offlineTask: string;
   /** Live: what this operative is for, in one line. Goes into its instructions. */
   remit: string;
-  /** Live: the real jobs it works through. */
+  /** Live: everything it knows how to do. */
+  skills: readonly Skill[];
+  /** Live: its core skills as jobs, in the order Deploy works through them. */
   jobs: readonly Directive[];
 }
 
@@ -159,6 +182,8 @@ export type SyndicateAction =
   | { type: "SET_ALL"; status: "active" | "idle"; ts: string }
   | { type: "PATCH_CONFIG"; id: AgentId; patch: Partial<AgentConfig>; ts: string }
   | { type: "ASSIGN"; id: AgentId; text: string; ts: string }
+  /** Run one of an operative's skills now. `input` is whatever the owner pasted for it. */
+  | { type: "RUN_SKILL"; id: AgentId; skill: string; input: string; ts: string }
   | { type: "COMMAND"; raw: string; ts: string }
   | { type: "CLEAR_LOG"; ts: string }
   /** A model is connected. Also sent when the operator swaps one model for another. */
