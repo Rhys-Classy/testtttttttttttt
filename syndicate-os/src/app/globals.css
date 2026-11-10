@@ -1,0 +1,360 @@
+@import "tailwindcss";
+
+/*
+ * SYNDICATE.OS — void black, three neons, hard edges.
+ * Fonts (Inter + JetBrains Mono) are loaded from Google Fonts by next/font in
+ * layout.tsx, which self-hosts them and exposes the two variables used below.
+ */
+
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  /* Whatever --accent resolves to on the nearest ancestor: each card sets its own. */
+  --color-accent: var(--accent);
+}
+
+@theme {
+  --color-void: #050505;
+  --color-panel: #0a0a0c;
+  --color-raised: #121216;
+  --color-line: #24242c;
+  --color-ink: #eaeaea;
+  --color-mute: #8d8d99;
+  --color-pink: #ff0055;
+  --color-acid: #39ff14;
+  --color-cyan: #00f0ff;
+
+  --animate-glitch: glitch-anim 380ms steps(2, jump-none) both;
+  --animate-blink: blink 1s steps(1, end) infinite;
+  --animate-pulse-dot: pulse-dot 1.4s ease-in-out infinite;
+  --animate-log-in: log-in 140ms ease-out both;
+  --animate-sweep: sweep 2.4s linear infinite;
+}
+
+:root {
+  --accent: #00f0ff;
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    background: var(--color-void);
+  }
+
+  body {
+    background: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+
+  ::selection {
+    background: var(--color-pink);
+    color: var(--color-void);
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--color-cyan);
+    outline-offset: 2px;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #33333d transparent;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+/* ---------------------------------------------------------------- CRT ---- */
+
+/*
+ * Wrap the app in .crt-scanline for the retro-monitor treatment:
+ *   ::before  fine scanlines that crawl down the glass
+ *   ::after   a soft refresh band that rolls through every few seconds
+ * Both sit above everything and ignore the pointer.
+ */
+.crt-scanline {
+  position: relative;
+  isolation: isolate;
+}
+
+.crt-scanline::before {
+  content: "";
+  position: fixed;
+  inset: -6px 0;
+  z-index: 90;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0.045) 0,
+    rgb(255 255 255 / 0.045) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  animation:
+    scanline-drift 1.2s linear infinite,
+    crt-flicker 7s steps(1, end) infinite;
+  will-change: transform;
+}
+
+.crt-scanline::after {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: 28vh;
+  z-index: 91;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(0 240 255 / 0.03) 42%,
+    rgb(255 255 255 / 0.045) 50%,
+    rgb(255 0 85 / 0.03) 58%,
+    transparent
+  );
+  animation: crt-roll 9s linear infinite;
+  will-change: transform;
+}
+
+/* Darkened corners, like curved glass. */
+.crt-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 89;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 58%, rgb(0 0 0 / 0.55) 100%);
+}
+
+@keyframes scanline-drift {
+  to {
+    transform: translate3d(0, 3px, 0);
+  }
+}
+
+@keyframes crt-roll {
+  from {
+    transform: translate3d(0, -30vh, 0);
+  }
+  to {
+    transform: translate3d(0, 110vh, 0);
+  }
+}
+
+@keyframes crt-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  47% {
+    opacity: 0.72;
+  }
+  48% {
+    opacity: 1;
+  }
+  81% {
+    opacity: 0.85;
+  }
+  82% {
+    opacity: 1;
+  }
+}
+
+/* -------------------------------------------------------------- glitch ---- */
+
+/* One short burst of RGB split, skew and slicing. Use via `animate-glitch`. */
+@keyframes glitch-anim {
+  0%,
+  100% {
+    transform: none;
+    text-shadow: none;
+    clip-path: inset(0);
+  }
+  20% {
+    transform: translate(-1px, 1px) skewX(-6deg);
+    text-shadow:
+      2px 0 var(--color-pink),
+      -2px 0 var(--color-cyan);
+  }
+  40% {
+    transform: translate(1px, -1px) skewX(4deg);
+    text-shadow:
+      -2px 0 var(--color-pink),
+      2px 0 var(--color-cyan);
+    clip-path: inset(12% 0 38% 0);
+  }
+  60% {
+    transform: translate(-1px, 0);
+    text-shadow:
+      1px 0 var(--color-acid),
+      -1px 0 var(--color-pink);
+    clip-path: inset(55% 0 8% 0);
+  }
+  80% {
+    transform: translate(1px, 1px);
+    text-shadow: none;
+    clip-path: inset(0);
+  }
+}
+
+.glitch-anim {
+  animation: glitch-anim 380ms steps(2, jump-none) both;
+}
+
+/* ------------------------------------------------------------ utilities ---- */
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 8px 1px currentColor;
+  }
+}
+
+@keyframes log-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+/* Faint blueprint grid behind the operatives. */
+.grid-floor {
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.028) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+/* Diagonal hazard stripes for nodes that are powered down. */
+.hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgb(255 255 255 / 0.05) 0,
+    rgb(255 255 255 / 0.05) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+
+/* Square, accent-coloured range slider. */
+.syn-range {
+  appearance: none;
+  width: 100%;
+  height: 28px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.syn-range::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--color-line);
+}
+
+.syn-range::-moz-range-track {
+  height: 4px;
+  background: var(--color-line);
+}
+
+.syn-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 22px;
+  margin-top: -9px;
+  border: 0;
+  border-radius: 0;
+  background: var(--accent);
+  box-shadow: 0 0 14px -2px var(--accent);
+}
+
+.syn-range::-moz-range-thumb {
+  width: 14px;
+  height: 22px;
+  border: 0;
+  border-radius: 0;
+  background: var(--accent);
+  box-shadow: 0 0 14px -2px var(--accent);
+}
+
+/* ----------------------------------------------------------------- boot ---- */
+
+.boot-overlay {
+  animation: boot-out 320ms ease-in 1700ms forwards;
+}
+
+.boot-line {
+  opacity: 0;
+  animation: boot-line 1ms linear forwards;
+  animation-delay: calc(var(--i) * 190ms + 180ms);
+}
+
+.boot-bar {
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: boot-bar 1500ms cubic-bezier(0.2, 0.7, 0.2, 1) 120ms forwards;
+}
+
+@keyframes boot-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@keyframes boot-line {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes boot-bar {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* ------------------------------------------------------- reduced motion ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  .crt-scanline::before {
+    animation: none;
+  }
+
+  .crt-scanline::after,
+  .boot-overlay {
+    display: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* syndicate-os/ is a separate prototype app with its own styles; keep its classes out of this build. */
+@source not "../../syndicate-os";
+
 /*
  * Dark by default: soft charcoal surfaces, off-white text (never pure #fff on
  * pure black), desaturated status colours. Light is opt-in per user
