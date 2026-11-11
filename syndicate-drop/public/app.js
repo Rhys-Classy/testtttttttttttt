@@ -71,6 +71,7 @@
   }
 
   function renderOps(items, retailers) {
+    items = items.filter((i) => i.url);
     const names = [...new Set([...retailers.slice(0, 8), ...items.map((i) => i.retailer)])].slice(0, 12);
     $('ops').innerHTML = names.map((name, idx) => {
       const mine = items.filter((i) => i.retailer === name && i.active !== false);
@@ -96,6 +97,7 @@
   }
 
   function statusChip(i) {
+    if (!i.url) return '<span class="chip s-UNKNOWN">◷ CALENDAR</span>';
     const s = i.active === false ? 'PAUSED' : i.status || 'CHECKING';
     const label = { IN_STOCK: '■ IN STOCK', PREORDER: '■ PREORDER', OUT_OF_STOCK: '○ SOLD OUT', BLOCKED: '⊗ BLOCKED', ERROR: '✕ ERROR', UNKNOWN: '? UNKNOWN', PAUSED: '‖ PAUSED', CHECKING: '↻ CHECKING' }[s] || s;
     return `<span class="chip s-${esc(s)} ${LIVE.has(s) ? 'fill' : ''}">${esc(label)}</span>`;
@@ -116,11 +118,11 @@
         <div class="row-main">
           <div class="row-name">${esc(i.name)}</div>
           <div class="row-meta">${statusChip(i)}<span>${esc(i.retailer)}</span><span>${esc(i.kind.replace('_', ' '))}</span>
-            <span>${i.price ? '$' + i.price.toFixed(2) : '$—'}${over}</span><span>checked ${ago(i.lastChecked)}${i.source && i.source !== 'none' ? ' via ' + esc(i.source) : ''}</span>${rel}</div>
+            ${i.url ? `<span>${i.price ? '$' + i.price.toFixed(2) : '$—'}${over}</span><span>checked ${ago(i.lastChecked)}${i.source && i.source !== 'none' ? ' via ' + esc(i.source) : ''}</span>` : ''}${rel}</div>
         </div>
         <div class="row-actions">
-          <a class="btn ${live ? 'fill buy' : ''}" href="${safeUrl(i.url)}" target="_blank" rel="noopener noreferrer">${live ? '▶ BUY NOW' : 'OPEN'} ↗</a>
-          <button class="btn cyan" data-act="check" data-id="${esc(i.id)}" type="button">↻ CHECK</button>
+          ${i.url ? `<a class="btn ${live ? 'fill buy' : ''}" href="${safeUrl(i.url)}" target="_blank" rel="noopener noreferrer">${live ? '▶ BUY NOW' : 'OPEN'} ↗</a>
+          <button class="btn cyan" data-act="check" data-id="${esc(i.id)}" type="button">↻ CHECK</button>` : ''}
           <button class="btn" data-act="toggle" data-id="${esc(i.id)}" type="button">${i.active === false ? '▶ RESUME' : '‖ PAUSE'}</button>
           <button class="btn pink" data-act="del" data-id="${esc(i.id)}" type="button" aria-label="Stop watching ${esc(i.name)}">✕</button>
         </div>

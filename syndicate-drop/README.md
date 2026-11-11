@@ -33,7 +33,8 @@ account and card on each retailer, so you check out by hand in about 20 seconds.
 ## Why a home PC
 
 Big W, EB Games, Kmart and Toymate block requests from cloud servers (checked 11 Nov 2026).
-From a home internet connection, they treat the monitor like any visitor. If a page still shows
+From a home internet connection, they treat the monitor like any visitor.
+JB Hi-Fi loads stock after the page opens, so its pages read `UNKNOWN`; Target, Kmart, Big W, EB Games and Amazon AU publish stock in the page itself. If a page still shows
 `BLOCKED`, the monitor backs off for 5 minutes and the daily brief lists it.
 
 ## Telegram commands

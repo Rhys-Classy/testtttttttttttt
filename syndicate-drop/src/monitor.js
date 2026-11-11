@@ -33,7 +33,7 @@ export function shouldAlert(item, next) {
 }
 
 export function isDue(item, now) {
-  if (item.active === false) return false;
+  if (item.active === false || !item.url) return false;
   const interval = Math.max(MIN_INTERVAL_SEC, item.intervalSec || 30);
   const wait = item.status === STATUS.BLOCKED ? Math.max(interval, BLOCK_BACKOFF_SEC) : interval;
   return !item.lastChecked || now - item.lastChecked >= wait * 1000;
@@ -51,7 +51,7 @@ export class Monitor {
   start() {
     if (this.running) return;
     this.running = true;
-    this.store.log('ok', 'SYSTEM', `monitor online, ${this.store.state.items.length} products on watch`);
+    this.store.log('ok', 'SYSTEM', `monitor online, ${this.store.state.items.filter((i) => i.url).length} product pages on watch`);
     this.loop = setInterval(() => this.tick(), 2000);
   }
 

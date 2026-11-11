@@ -25,7 +25,7 @@ function upcomingLines(state, today) {
   if (!list.length) return ['> nothing with a release date in the next 14 days.'];
   return list.map((i) => {
     const d = daysBetween(today, i.releaseDate);
-    return `> ${d === 0 ? 'TODAY' : d === 1 ? 'TOMORROW' : `in ${d}d`} (${i.releaseDate}) — ${i.name} @ ${i.retailer}`;
+    return `> ${d === 0 ? 'TODAY' : d === 1 ? 'TOMORROW' : `in ${d}d`} (${i.releaseDate}) — ${i.name}${i.url ? ` @ ${i.retailer}` : ''}`;
   });
 }
 
@@ -97,7 +97,7 @@ export function releaseReminders(state, now) {
     out.push({
       key: `${kind}:${i.id}:${i.releaseDate}`,
       msg: {
-        text: `${eve ? '⏰ **RELEASES TOMORROW**' : '🚨 **RELEASE DAY**'} — ${i.name} @ **${i.retailer}**\n${eve ? '> log in, save your card and address tonight.' : '> monitor is watching. phone on loud.'}\n${i.url}`,
+        text: `${eve ? '⏰ **RELEASES TOMORROW**' : '🚨 **RELEASE DAY**'} — ${i.name}${i.url ? ` @ **${i.retailer}**` : ''}\n${eve ? '> log in to each retailer, save your card and address tonight.' : i.url ? '> monitor is watching. phone on loud.' : '> calendar only: add the retailer product links to the watchlist.'}${i.url ? `\n${i.url}` : ''}`,
       },
     });
   }

@@ -10,6 +10,7 @@ import { retailerOf, KNOWN_RETAILERS, BUYABLE } from './detect.js';
 import { alertChannels, sendAlert, telegramCall, TEST_ALERT } from './alerts.js';
 import { Digest } from './digest.js';
 import { TelegramBot } from './telegram.js';
+import { SEED_ITEMS } from './seed.js';
 
 // Packaged as a single .exe (Node SEA) the web files are embedded assets and
 // data sits in a folder next to the program. Run from source, both come from the repo.
@@ -120,6 +121,40 @@ function checkProductUrl(raw) {
   return u.toString();
 }
 
+/** A watched product (with a link) or a calendar entry (date only). */
+function makeItem(b) {
+  const releaseDate = /^\d{4}-\d{2}-\d{2}$/.test(b.releaseDate || '') ? b.releaseDate : null;
+  const rawUrl = String(b.url || '').trim();
+  if (!rawUrl && !releaseDate) throw new BadRequest('Paste a product link, or give a release date to add it to the calendar.');
+  const url = rawUrl ? checkProductUrl(rawUrl) : null;
+  if (url && store.state.items.some((i) => i.url === url)) throw new BadRequest('That product is already on the watchlist.');
+  return {
+    id: newId(),
+    name: cleanText(b.name) || 'Unnamed product',
+    url,
+    retailer: url ? retailerOf(url) : 'CALENDAR',
+    kind: KINDS.includes(b.kind) ? b.kind : 'OTHER',
+    releaseDate,
+    intervalSec: Math.max(MIN_INTERVAL_SEC, Math.min(3600, Number(b.intervalSec) || 30)),
+    maxPrice: b.maxPrice ? Number(b.maxPrice) || null : null,
+    inStockText: cleanText(b.inStockText, 80) || null,
+    outOfStockText: cleanText(b.outOfStockText, 80) || null,
+    active: true,
+    status: null,
+    price: null,
+    lastChecked: null,
+    lastChange: null,
+    lastAlertStatus: null,
+    addedAt: Date.now(),
+  };
+}
+
+if (store.fresh) {
+  for (const s of SEED_ITEMS) store.state.items.push(makeItem(s));
+  store.log('info', 'SYSTEM', `first run: loaded ${SEED_ITEMS.length} upcoming releases and product pages`);
+  store.flush();
+}
+
 function stats() {
   const { items, buys, alertsSent } = store.state;
   let spent = 0;
@@ -198,33 +233,11 @@ const routes = {
   'POST /api/brief': async () => ({ lines: await digest.sendBrief() }),
 
   'POST /api/items': async (req) => {
-    const b = await readJson(req);
-    const url = checkProductUrl(b.url);
-    if (store.state.items.some((i) => i.url === url)) throw new BadRequest('That product is already on the watchlist.');
-    const name = cleanText(b.name) || 'Unnamed product';
-    const item = {
-      id: newId(),
-      name,
-      url,
-      retailer: retailerOf(url),
-      kind: KINDS.includes(b.kind) ? b.kind : 'OTHER',
-      releaseDate: /^\d{4}-\d{2}-\d{2}$/.test(b.releaseDate || '') ? b.releaseDate : null,
-      intervalSec: Math.max(MIN_INTERVAL_SEC, Math.min(3600, Number(b.intervalSec) || 30)),
-      maxPrice: b.maxPrice ? Number(b.maxPrice) || null : null,
-      inStockText: cleanText(b.inStockText, 80) || null,
-      outOfStockText: cleanText(b.outOfStockText, 80) || null,
-      active: true,
-      status: null,
-      price: null,
-      lastChecked: null,
-      lastChange: null,
-      lastAlertStatus: null,
-      addedAt: Date.now(),
-    };
+    const item = makeItem(await readJson(req));
     store.state.items.push(item);
-    store.log('info', 'OPERATOR', `watching ${name} @ ${item.retailer}`);
+    store.log('info', 'OPERATOR', item.url ? `watching ${item.name} @ ${item.retailer}` : `added ${item.name} to the calendar`);
     store.save();
-    monitor.check(item);
+    if (item.url) monitor.check(item);
     return item;
   },
 

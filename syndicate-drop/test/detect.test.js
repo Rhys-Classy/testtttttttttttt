@@ -64,10 +64,11 @@ test('alerts once per buyable state, re-arms after sell-out', () => {
 
 test('isDue respects interval floor, pause and block backoff', () => {
   const now = 1_000_000;
-  assert.equal(isDue({ intervalSec: 5, lastChecked: now - 10_000 }, now), false);
-  assert.equal(isDue({ intervalSec: 5, lastChecked: now - 16_000 }, now), true);
+  assert.equal(isDue({ url: "https://a", intervalSec: 5, lastChecked: now - 10_000 }, now), false);
+  assert.equal(isDue({ url: "https://a", intervalSec: 5, lastChecked: now - 16_000 }, now), true);
   assert.equal(isDue({ active: false }, now), false);
-  assert.equal(isDue({ intervalSec: 30, status: STATUS.BLOCKED, lastChecked: now - 60_000 }, now), false);
+  assert.equal(isDue({}, now), false, "calendar entries are never fetched");
+  assert.equal(isDue({ url: "https://a", intervalSec: 30, status: STATUS.BLOCKED, lastChecked: now - 60_000 }, now), false);
 });
 
 test('checkUrl maps 403 to BLOCKED and network failure to ERROR', async () => {
