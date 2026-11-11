@@ -6,6 +6,13 @@
   let state = null;
   let seenLive = null;
   let lastLogT = 0;
+  let settingsLoaded = false;
+
+  function openDrawer() {
+    $('drawer').hidden = $('scrim').hidden = false;
+    try { localStorage.setItem('sd-seen-setup', '1'); } catch { /* private mode */ }
+  }
+  function closeDrawer() { $('drawer').hidden = $('scrim').hidden = true; }
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const safeUrl = (u) => (/^https:\/\//i.test(u || '') ? esc(u) : '#');
@@ -27,7 +34,7 @@
   }
 
   // Boot screen
-  const bootLines = ['> SYNDICATE.OS kernel 1.0 loaded', '> DROP_DESK module online', '> retailer uplinks: BIG W · EB · TARGET · KMART · JB', '> alert relays: SMS · DISCORD', '> ready.'];
+  const bootLines = ['> SYNDICATE.OS kernel 1.0 loaded', '> DROP_DESK module online', '> retailer uplinks: BIG W · EB · TARGET · KMART · JB', '> alert relays: TELEGRAM · DISCORD · DESKTOP', '> ready.'];
   bootLines.forEach((l, i) => setTimeout(() => { $('bootLines').insertAdjacentHTML('beforeend', `<div>${esc(l)}</div>`); }, i * 300));
 
   function beep() {
@@ -126,17 +133,26 @@
       $('buys').innerHTML = '<div class="empty">No buys logged. After each drop, log what you bought here; when it sells, tap SOLD and enter the sale price.</div>';
       return;
     }
+    const NEXT = { ORDERED: ['SHIPPED', '🚚 SHIPPED'], SHIPPED: ['DELIVERED', '📦 DELIVERED'] };
+    const OCOL = { ORDERED: 'amber', SHIPPED: 'cyan', DELIVERED: 'acid', CANCELLED: 'pink' };
+    const today = new Date().toISOString().slice(0, 10);
     $('buys').innerHTML = buys.map((b) => {
       const cost = b.unitCost * b.qty;
       const sold = b.soldUnitPrice !== null;
       const pl = sold ? b.soldUnitPrice * b.qty - cost - (b.fees || 0) : null;
+      const os = b.orderStatus || 'DELIVERED';
+      const next = NEXT[os];
+      const overdue = b.eta && os !== 'DELIVERED' && os !== 'CANCELLED' && b.eta < today;
       return `<div class="row">
         <div class="row-main">
           <div class="row-name">${esc(b.qty)} × ${esc(b.itemName)}</div>
-          <div class="row-meta"><span>${esc(b.retailer)}</span><span>${esc(b.date)}</span><span>cost ${money(cost)}</span>
+          <div class="row-meta"><span class="${OCOL[os] || ''}">${esc(os)}</span>${b.eta && os !== 'DELIVERED' ? `<span class="${overdue ? 'pink' : ''}">ETA ${esc(b.eta)}${overdue ? ' OVERDUE' : ''}</span>` : ''}${b.tracking ? `<span>#${esc(b.tracking)}</span>` : ''}
+            <span>${esc(b.retailer)}</span><span>${esc(b.date)}</span><span>cost ${money(cost)}</span>
             ${sold ? `<span>sold ${money(b.soldUnitPrice)} ea${b.fees ? ', fees ' + money(b.fees) : ''}</span><span class="${pl >= 0 ? 'acid' : 'pink'}">${signed(pl)}</span>` : '<span class="amber">UNSOLD</span>'}</div>
         </div>
         <div class="row-actions">
+          ${next ? `<button class="btn cyan" data-act="status" data-to="${next[0]}" data-id="${esc(b.id)}" type="button">${next[1]}</button>` : ''}
+          ${os !== 'DELIVERED' && os !== 'CANCELLED' ? `<button class="btn" data-act="eta" data-id="${esc(b.id)}" type="button">ETA / #</button>` : ''}
           <button class="btn acid" data-act="sold" data-id="${esc(b.id)}" type="button">${sold ? '✎ EDIT SALE' : '$ SOLD'}</button>
           <button class="btn pink" data-act="delbuy" data-id="${esc(b.id)}" type="button" aria-label="Delete entry">✕</button>
         </div>
@@ -174,8 +190,21 @@
     renderBuys(state.buys);
     renderFeed(state.log);
     renderLive(state.items);
-    const c = state.channels;
-    $('chanInfo').textContent = `alerts › sms ${c.sms ? 'ON' : 'NOT SET UP'} · discord ${c.discord ? 'ON' : 'NOT SET UP'}`;
+    const st = state.settings;
+    $('chanInfo').textContent = `telegram ${st.telegramConnected ? 'ON' : st.telegramSet ? 'WAITING FOR /start' : 'NOT SET UP'} · discord ${st.discordSet ? 'ON' : 'OFF'} · brief ${st.briefEnabled ? st.briefTime : 'OFF'}`;
+    $('settingsBtn').textContent = st.telegramConnected ? '■ TELEGRAM BOT' : '⚙ CONNECT TELEGRAM';
+    $('tgStatus').innerHTML = st.telegramConnected
+      ? `<span class="acid">■ CONNECTED</span> @${esc(st.telegramBot)}<br><span class="mute">message it /brief, /orders, /upcoming or /live any time</span>`
+      : st.telegramSet
+        ? `<span class="amber">● WAITING</span> open <a href="https://t.me/${esc(st.telegramBot)}" target="_blank" rel="noopener">@${esc(st.telegramBot)}</a> in Telegram and press Start`
+        : '<span class="mute">○ NOT CONNECTED</span> follow the 3 steps below. takes about a minute.';
+    if (st.telegramError) $('tgStatus').insertAdjacentHTML('beforeend', `<br><span class="pink">${esc(st.telegramError)}</span>`);
+    if (!settingsLoaded) {
+      settingsLoaded = true;
+      $('briefForm').briefTime.value = st.briefTime;
+      $('briefForm').briefEnabled.checked = st.briefEnabled;
+      if (!st.telegramConnected && !localStorage.getItem('sd-seen-setup')) openDrawer();
+    }
     if (!$('kindSel').options.length) {
       $('kindSel').innerHTML = state.kinds.map((k) => `<option value="${esc(k)}">${esc(k.replace('_', ' '))}</option>`).join('');
       $('retailerList').innerHTML = state.retailers.map((r) => `<option value="${esc(r)}">`).join('');
@@ -227,6 +256,14 @@
       if (b.dataset.act === 'toggle') await api(`/api/items/${id}/toggle`, { method: 'POST' });
       if (b.dataset.act === 'del' && confirm('Stop watching this product?')) await api(`/api/items/${id}`, { method: 'DELETE' });
       if (b.dataset.act === 'delbuy' && confirm('Delete this ledger entry?')) await api(`/api/buys/${id}`, { method: 'DELETE' });
+      if (b.dataset.act === 'status') await api(`/api/buys/${id}`, { method: 'PATCH', body: JSON.stringify({ orderStatus: b.dataset.to }) });
+      if (b.dataset.act === 'eta') {
+        const eta = prompt('Expected delivery date (YYYY-MM-DD), or leave blank:');
+        if (eta === null) return;
+        const tracking = prompt('Tracking number, or leave blank:');
+        if (tracking === null) return;
+        await api(`/api/buys/${id}`, { method: 'PATCH', body: JSON.stringify({ eta: eta.trim(), tracking }) });
+      }
       if (b.dataset.act === 'sold') {
         const price = prompt('Sold price for EACH one, in dollars:');
         if (price === null) return;
@@ -246,11 +283,37 @@
     refresh();
   });
 
+  $('settingsBtn').addEventListener('click', openDrawer);
+  $('closeDrawer').addEventListener('click', closeDrawer);
+  $('scrim').addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+
+  async function saveSettings(body, form) {
+    $('setErr').textContent = '';
+    const btn = form && form.querySelector('button[type=submit]');
+    if (btn) btn.disabled = true;
+    try {
+      await api('/api/settings', { method: 'POST', body: JSON.stringify(body) });
+      if (form) form.querySelectorAll('input[type=password]').forEach((i) => { i.value = ''; });
+      await refresh();
+    } catch (err) { $('setErr').textContent = err.message; }
+    if (btn) btn.disabled = false;
+  }
+  $('tgForm').addEventListener('submit', (e) => { e.preventDefault(); saveSettings({ telegramToken: e.target.telegramToken.value }, e.target); });
+  $('discordForm').addEventListener('submit', (e) => { e.preventDefault(); saveSettings({ discordWebhook: e.target.discordWebhook.value }, e.target); });
+  $('briefForm').addEventListener('submit', (e) => { e.preventDefault(); saveSettings({ briefTime: e.target.briefTime.value, briefEnabled: e.target.briefEnabled.checked }, e.target); });
+  $('briefNow').addEventListener('click', async () => {
+    $('briefNow').disabled = true;
+    try { await api('/api/brief', { method: 'POST' }); } catch (err) { $('setErr').textContent = err.message; }
+    $('briefNow').disabled = false;
+    refresh();
+  });
+
   $('notifyBtn').addEventListener('click', async () => {
     beep();
-    if (!('Notification' in window)) return alert('This browser cannot show notifications. SMS and Discord still work.');
+    if (!('Notification' in window)) return alert('This browser cannot show notifications. Telegram still works.');
     const p = await Notification.requestPermission();
-    $('notifyBtn').textContent = p === 'granted' ? '■ PHONE ALERTS ON' : '⚑ PHONE ALERTS';
+    $('notifyBtn').textContent = p === 'granted' ? '■ DESKTOP ALERTS ON' : '⚑ DESKTOP ALERTS';
   });
 
   refresh();

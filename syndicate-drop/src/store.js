@@ -14,7 +14,7 @@ export class Store {
   constructor(dir) {
     this.file = path.join(dir, 'state.json');
     fs.mkdirSync(dir, { recursive: true });
-    this.state = { items: [], buys: [], log: [], alertsSent: 0 };
+    this.state = { items: [], buys: [], log: [], alertsSent: 0, settings: {} };
     if (fs.existsSync(this.file)) {
       try {
         this.state = { ...this.state, ...JSON.parse(fs.readFileSync(this.file, 'utf8')) };

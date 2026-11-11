@@ -2,20 +2,68 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { Store, newId } from './store.js';
 import { Monitor, MIN_INTERVAL_SEC } from './monitor.js';
 import { retailerOf, KNOWN_RETAILERS, BUYABLE } from './detect.js';
-import { alertChannels, sendAlert } from './alerts.js';
+import { alertChannels, sendAlert, telegramCall, TEST_ALERT } from './alerts.js';
+import { Digest } from './digest.js';
+import { TelegramBot } from './telegram.js';
 
-const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+// Packaged as a single .exe (Node SEA) the web files are embedded assets and
+// data sits in a folder next to the program. Run from source, both come from the repo.
+const require = createRequire(path.resolve(process.argv[1] || '.'));
+const sea = (() => {
+  try {
+    const s = require('node:sea');
+    return s.isSea() ? s : null;
+  } catch {
+    return null;
+  }
+})();
+const ROOT = sea ? path.dirname(process.execPath) : path.dirname(path.dirname(path.resolve(process.argv[1])));
 const PUBLIC = path.join(ROOT, 'public');
-const PORT = Number(process.env.PORT || 8080);
+const START_PORT = Number(process.env.PORT || 8080);
+const HOST = process.env.HOST || '127.0.0.1';
 const PASSWORD = process.env.DASH_PASSWORD || '';
 const KINDS = ['ETB', 'BOOSTER_BOX', 'BOOSTER_BUNDLE', 'COLLECTION', 'TIN', 'OTHER'];
 
-const store = new Store(process.env.DATA_DIR || path.join(ROOT, 'data'));
+const store = new Store(process.env.DATA_DIR || path.join(ROOT, sea ? 'SyndicateDrop-data' : 'data'));
+
+function readPublic(file) {
+  if (sea) {
+    try {
+      return Buffer.from(sea.getAsset(file));
+    } catch {
+      return null;
+    }
+  }
+  const full = path.join(PUBLIC, file);
+  return fs.existsSync(full) ? fs.readFileSync(full) : null;
+}
+
+function openBrowser(url) {
+  const cmd = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]] : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
+  execFile(cmd[0], cmd[1], () => {});
+}
+
+function publicSettings() {
+  const s = store.state.settings;
+  return {
+    telegramSet: Boolean(s.telegramToken),
+    telegramConnected: Boolean(s.telegramToken && s.telegramChatId),
+    telegramBot: s.telegramBotName || null,
+    telegramError: s.telegramError || null,
+    discordSet: Boolean(s.discordWebhook),
+    briefTime: s.briefTime || '08:00',
+    briefEnabled: s.briefEnabled !== false,
+  };
+}
 const monitor = new Monitor({ store });
+const digest = new Digest({ store, alert: sendAlert });
+const bot = new TelegramBot({ store });
+const ORDER_STATUSES = ['ORDERED', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
 
 class BadRequest extends Error {}
 
@@ -102,9 +150,52 @@ const routes = {
     stats: stats(),
     retailers: KNOWN_RETAILERS,
     kinds: KINDS,
-    channels: alertChannels(),
+    channels: alertChannels(store.state.settings),
+    settings: publicSettings(),
     minInterval: MIN_INTERVAL_SEC,
   }),
+
+  'POST /api/settings': async (req) => {
+    const b = await readJson(req);
+    const s = store.state.settings;
+    if ('discordWebhook' in b) {
+      const v = String(b.discordWebhook || '').trim();
+      if (v && !/^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+$/.test(v)) {
+        throw new BadRequest('That is not a Discord webhook link. It should start with https://discord.com/api/webhooks/');
+      }
+      s.discordWebhook = v || null;
+    }
+    if ('telegramToken' in b) {
+      const v = String(b.telegramToken || '').trim();
+      if (v && v !== s.telegramToken) {
+        if (!/^\d{5,15}:[\w-]{30,60}$/.test(v)) throw new BadRequest('That is not a Telegram bot token. BotFather sends one that looks like 123456789:AA…');
+        let me;
+        try {
+          me = await telegramCall(v, 'getMe', {});
+        } catch (e) {
+          throw new BadRequest(`Telegram rejected that token (${e.message}). Copy it again from BotFather.`);
+        }
+        s.telegramToken = v;
+        s.telegramBotName = me.username;
+        s.telegramChatId = null;
+        s.telegramError = null;
+        store.log('ok', 'TELEGRAM', `bot @${me.username} linked. send it /start in Telegram`);
+      } else if (!v) {
+        s.telegramToken = s.telegramChatId = s.telegramBotName = null;
+      }
+      bot.sync();
+    }
+    if ('briefTime' in b) {
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(b.briefTime || '')) throw new BadRequest('Brief time must look like 08:00.');
+      s.briefTime = b.briefTime;
+    }
+    if ('briefEnabled' in b) s.briefEnabled = Boolean(b.briefEnabled);
+    store.log('info', 'OPERATOR', 'settings saved');
+    store.save();
+    return publicSettings();
+  },
+
+  'POST /api/brief': async () => ({ lines: await digest.sendBrief() }),
 
   'POST /api/items': async (req) => {
     const b = await readJson(req);
@@ -138,10 +229,7 @@ const routes = {
   },
 
   'POST /api/test-alert': async () => {
-    const lines = await sendAlert({
-      sms: 'SYNDICATE.DROP test alert. If you got this, drop alerts will reach you.',
-      discord: 'SYNDICATE.DROP test alert. If you can read this, drop alerts will land here.',
-    });
+    const lines = await sendAlert(TEST_ALERT, store.state.settings);
     store.log('alert', 'OPERATOR', `test alert → ${lines.join(', ')}`);
     return { lines };
   },
@@ -160,6 +248,9 @@ const routes = {
       unitCost,
       soldUnitPrice: toCents(b.soldUnitPrice, 'Sold price'),
       fees: toCents(b.fees, 'Fees') || 0,
+      orderStatus: ORDER_STATUSES.includes(b.orderStatus) ? b.orderStatus : 'ORDERED',
+      eta: /^\d{4}-\d{2}-\d{2}$/.test(b.eta || '') ? b.eta : null,
+      tracking: cleanText(b.tracking, 80) || null,
       date: new Date().toISOString().slice(0, 10),
     };
     store.state.buys.unshift(buy);
@@ -200,10 +291,10 @@ async function handle(req, res) {
   if (req.method === 'GET' && !url.pathname.startsWith('/api/')) {
     const file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
     if (!/^[a-z0-9_-]+\.(html|css|js|svg)$/.test(file)) return send(res, 404, 'Not found', 'text/plain');
-    const full = path.join(PUBLIC, file);
-    if (!fs.existsSync(full)) return send(res, 404, 'Not found', 'text/plain');
+    const body = readPublic(file);
+    if (!body) return send(res, 404, 'Not found', 'text/plain');
     const types = { html: 'text/html; charset=utf-8', css: 'text/css', js: 'text/javascript', svg: 'image/svg+xml' };
-    return send(res, 200, fs.readFileSync(full), types[file.split('.').pop()]);
+    return send(res, 200, body, types[file.split('.').pop()]);
   }
 
   const direct = routes[`${req.method} ${url.pathname}`];
@@ -228,9 +319,23 @@ async function handle(req, res) {
     }
     if (req.method === 'PATCH') {
       const b = await readJson(req);
-      if ('soldUnitPrice' in b) buy.soldUnitPrice = toCents(b.soldUnitPrice, 'Sold price');
+      if ('soldUnitPrice' in b) {
+        buy.soldUnitPrice = toCents(b.soldUnitPrice, 'Sold price');
+        if (buy.soldUnitPrice !== null) store.log('ok', 'LEDGER', `sold ${buy.qty} × ${buy.itemName} at $${(buy.soldUnitPrice / 100).toFixed(2)}`);
+      }
       if ('fees' in b) buy.fees = toCents(b.fees, 'Fees') || 0;
-      store.log('ok', 'LEDGER', `sold ${buy.qty} × ${buy.itemName} at $${((buy.soldUnitPrice || 0) / 100).toFixed(2)}`);
+      if ('eta' in b) buy.eta = /^\d{4}-\d{2}-\d{2}$/.test(b.eta || '') ? b.eta : null;
+      if ('tracking' in b) buy.tracking = cleanText(b.tracking, 80) || null;
+      if ('orderStatus' in b) {
+        if (!ORDER_STATUSES.includes(b.orderStatus)) throw new BadRequest('Unknown order status.');
+        if (b.orderStatus !== buy.orderStatus) {
+          buy.orderStatus = b.orderStatus;
+          const icon = { SHIPPED: '🚚', DELIVERED: '📦', CANCELLED: '✕', ORDERED: '🧾' }[b.orderStatus];
+          const msg = `${icon} **${b.orderStatus}** — ${buy.qty} × ${buy.itemName} (${buy.retailer})${buy.eta && b.orderStatus === 'SHIPPED' ? `, ETA ${buy.eta}` : ''}${buy.tracking ? `, tracking ${buy.tracking}` : ''}`;
+          store.log('info', 'LEDGER', msg.replace(/\*\*/g, ''));
+          sendAlert({ text: msg }, store.state.settings);
+        }
+      }
       store.save();
       return send(res, 200, buy);
     }
@@ -248,14 +353,32 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`SYNDICATE.DROP on :${PORT}${PASSWORD ? '' : ' (WARNING: no DASH_PASSWORD set — dashboard is open)'}`);
-  monitor.start();
+// If the port is taken (e.g. the program is already open), try the next few.
+let port = START_PORT;
+server.on('error', (e) => {
+  if (e.code === 'EADDRINUSE' && port < START_PORT + 10) {
+    port += 1;
+    server.listen(port, HOST);
+  } else {
+    console.error(`Could not start: ${e.message}`);
+    process.exit(1);
+  }
 });
+server.on('listening', () => {
+  const url = `http://localhost:${port}`;
+  console.log(`\n  SYNDICATE.DROP is running.\n  Dashboard: ${url}\n  Data: ${path.dirname(store.file)}\n  Leave this window open. Close it to stop monitoring.\n`);
+  monitor.start();
+  digest.start();
+  bot.sync();
+  if (process.env.NO_BROWSER !== '1') openBrowser(url);
+});
+server.listen(port, HOST);
 
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, () => {
     monitor.stop();
+    digest.stop();
+    bot.stop();
     store.flush();
     process.exit(0);
   });

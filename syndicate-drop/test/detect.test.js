@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { detectStock, retailerOf, STATUS } from '../src/detect.js';
 import { shouldAlert, isDue, checkUrl } from '../src/monitor.js';
-import { formatDropAlert } from '../src/alerts.js';
+import { formatDropAlert, sendAlert, toPlain } from '../src/alerts.js';
+import { buildDigest, briefDue, releaseReminders } from '../src/digest.js';
+import { TelegramBot } from '../src/telegram.js';
 
 const ld = (obj) => `<html><script type="application/ld+json">${JSON.stringify(obj)}</script><body>x</body></html>`;
 
@@ -79,5 +81,73 @@ test('checkUrl maps 403 to BLOCKED and network failure to ERROR', async () => {
 
 test('alert text names the price cap breach', () => {
   const a = formatDropAlert({ name: 'ETB', retailer: 'BIG W', url: 'https://b', status: 'IN_STOCK', price: 120, maxPrice: 100 });
-  assert.match(a.sms, /IN STOCK: ETB @ BIG W \$120\.00 \(over your \$100 cap\)/);
+  assert.match(toPlain(a.text), /IN STOCK — ETB @ BIG W \$120\.00 \(over your \$100 cap\)\nhttps:\/\/b/);
+});
+
+test('telegram alert posts plain text to the owner chat', async () => {
+  const calls = [];
+  const fake = async (url, opts) => { calls.push([url, JSON.parse(opts.body)]); return { ok: true, status: 200, json: async () => ({ ok: true, result: {} }) }; };
+  const lines = await sendAlert({ text: '@here **LIVE** x' }, { telegramToken: '1:abc', telegramChatId: '42' }, fake);
+  assert.deepEqual(lines, ['telegram ok']);
+  assert.equal(calls[0][0], 'https://api.telegram.org/bot1:abc/sendMessage');
+  assert.deepEqual([calls[0][1].chat_id, calls[0][1].text], ['42', 'LIVE x']);
+});
+
+test('no channels set up: nothing sent, says so', async () => {
+  assert.match((await sendAlert({ text: 'x' }, {}, async () => assert.fail('no fetch')))[0], /not connected/);
+});
+
+test('telegram bot binds to the first /start and ignores strangers', async () => {
+  const sent = [];
+  const store = { state: { items: [], buys: [], settings: { telegramToken: 't' } }, log() {}, save() {} };
+  const fake = async (url, opts) => { sent.push(JSON.parse(opts.body)); return { ok: true, json: async () => ({ ok: true, result: {} }) }; };
+  const bot = new TelegramBot({ store, fetchImpl: fake });
+  await bot.handle({ chat: { id: 7 }, text: '/brief' });
+  assert.equal(sent.length, 0, 'unbound bot ignores everything but /start');
+  await bot.handle({ chat: { id: 7, first_name: 'R' }, text: '/start' });
+  assert.equal(store.state.settings.telegramChatId, '7');
+  await bot.handle({ chat: { id: 99 }, text: '/brief' });
+  assert.equal(sent.length, 1, 'stranger gets nothing');
+  await bot.handle({ chat: { id: 7 }, text: '/orders' });
+  assert.match(sent[1].text, /ON THE WAY/);
+});
+
+const NOW = new Date(2026, 10, 11, 9, 0).getTime(); // 11 Nov 2026, 9am local
+const sample = () => ({
+  items: [
+    { id: 'a', name: 'Ascended Heroes ETB', retailer: 'BIG W', releaseDate: '2026-11-12', status: 'OUT_OF_STOCK', url: 'https://x' },
+    { id: 'b', name: 'Far Box', retailer: 'TARGET', releaseDate: '2026-12-30', url: 'https://y' },
+    { id: 'c', name: 'Live ETB', retailer: 'JB HI-FI', status: 'IN_STOCK', price: 89, url: 'https://z' },
+  ],
+  buys: [
+    { itemName: 'ETB', retailer: 'BIG W', qty: 2, unitCost: 8900, soldUnitPrice: null, orderStatus: 'SHIPPED', eta: '2026-11-09', tracking: 'AP123' },
+    { itemName: 'Box', retailer: 'EB', qty: 1, unitCost: 25000, soldUnitPrice: 40000, fees: 3000, orderStatus: 'DELIVERED' },
+  ],
+  settings: {},
+});
+
+test('daily brief covers releases, live stock, orders and money', () => {
+  const t = toPlain(buildDigest(sample(), NOW).text);
+  assert.match(t, /TOMORROW \(2026-11-12\) — Ascended Heroes ETB @ BIG W/);
+  assert.doesNotMatch(t, /Far Box/, '49 days out is beyond 14');
+  assert.match(t, /Live ETB @ JB HI-FI \$89\.00/);
+  assert.match(t, /2 × ETB \(BIG W\) — SHIPPED, ETA 2026-11-09 — OVERDUE, chase it, tracking AP123/);
+  assert.match(t, /net profit on sold stock: \+\$120\.00/);
+  assert.match(t, /unsold stock: 2 items \(\$178\.00 tied up\)/);
+});
+
+test('brief is due once a day after the chosen time', () => {
+  assert.equal(briefDue({ briefTime: '08:00' }, NOW), true);
+  assert.equal(briefDue({ briefTime: '10:00' }, NOW), false);
+  assert.equal(briefDue({ briefTime: '08:00', lastBriefDate: '2026-11-11' }, NOW), false);
+  assert.equal(briefDue({ briefEnabled: false }, NOW), false);
+});
+
+test('release reminders: evening before from 6pm, and on the day', () => {
+  const s = sample();
+  assert.equal(releaseReminders(s, NOW).length, 0);
+  const eve = releaseReminders(s, new Date(2026, 10, 11, 18, 5).getTime());
+  assert.deepEqual(eve.map((r) => r.key), ['eve:a:2026-11-12']);
+  const day = releaseReminders(s, new Date(2026, 10, 12, 7, 0).getTime());
+  assert.deepEqual(day.map((r) => r.key), ['day:a:2026-11-12']);
 });

@@ -1,59 +1,64 @@
-// SMS via Twilio's REST API and Discord via a channel webhook. No SDKs.
-// Each channel is skipped quietly when its settings are missing.
+// Free alert channels only: a Telegram bot (main) and an optional Discord webhook.
+// Settings come from the dashboard and live in the state file.
 
-const env = (k) => (process.env[k] || '').trim();
-
-export function alertChannels() {
+export function alertChannels(settings = {}) {
   return {
-    sms: Boolean(env('TWILIO_ACCOUNT_SID') && env('TWILIO_AUTH_TOKEN') && env('TWILIO_FROM') && env('ALERT_SMS_TO')),
-    discord: Boolean(env('DISCORD_WEBHOOK_URL')),
+    telegram: Boolean(settings.telegramToken && settings.telegramChatId),
+    discord: Boolean(settings.discordWebhook),
   };
 }
 
-async function sendSms(body, fetchImpl) {
-  const sid = env('TWILIO_ACCOUNT_SID');
-  const auth = Buffer.from(`${sid}:${env('TWILIO_AUTH_TOKEN')}`).toString('base64');
-  const to = env('ALERT_SMS_TO').split(',').map((s) => s.trim()).filter(Boolean);
-  const results = [];
-  for (const number of to) {
-    const res = await fetchImpl(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
-      method: 'POST',
-      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ From: env('TWILIO_FROM'), To: number, Body: body.slice(0, 600) }),
-      signal: AbortSignal.timeout(10000),
-    });
-    results.push(res.ok ? `sms ${number.slice(-3)} ok` : `sms ${number.slice(-3)} failed (${res.status})`);
-  }
-  return results;
+/** Discord-style text to plain Telegram text. */
+export function toPlain(text) {
+  return text.replace(/\*\*/g, '').replace(/@here\s*/g, '');
 }
 
-async function sendDiscord(content, fetchImpl) {
-  const res = await fetchImpl(env('DISCORD_WEBHOOK_URL'), {
+export async function telegramCall(token, method, params, fetchImpl = fetch, timeoutMs = 10000) {
+  const res = await fetchImpl(`https://api.telegram.org/bot${token}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'SYNDICATE.DROP', content: content.slice(0, 1900) }),
+    body: JSON.stringify(params),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!body.ok) throw new Error(body.description || `Telegram HTTP ${res.status}`);
+  return body.result;
+}
+
+export async function sendTelegram(settings, text, fetchImpl = fetch) {
+  await telegramCall(settings.telegramToken, 'sendMessage', {
+    chat_id: settings.telegramChatId,
+    text: toPlain(text).slice(0, 4000),
+    disable_web_page_preview: true,
+  }, fetchImpl);
+}
+
+async function sendDiscord(msg, settings, fetchImpl) {
+  const res = await fetchImpl(settings.discordWebhook, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'SYNDICATE.DROP', content: msg.text.slice(0, 1900) }),
     signal: AbortSignal.timeout(10000),
   });
-  return [res.ok ? 'discord ok' : `discord failed (${res.status})`];
+  return res.ok ? 'discord ok' : `discord failed (${res.status})`;
 }
 
 /** Sends to every configured channel. Never throws; returns one line per attempt. */
-export async function sendAlert({ sms, discord }, fetchImpl = fetch) {
-  const ch = alertChannels();
+export async function sendAlert(msg, settings = {}, fetchImpl = fetch) {
+  const ch = alertChannels(settings);
   const jobs = [];
-  if (ch.sms) jobs.push(sendSms(sms, fetchImpl));
-  if (ch.discord) jobs.push(sendDiscord(discord, fetchImpl));
-  if (!jobs.length) return ['no alert channels configured'];
+  if (ch.telegram) jobs.push(sendTelegram(settings, msg.text, fetchImpl).then(() => 'telegram ok'));
+  if (ch.discord) jobs.push(sendDiscord(msg, settings, fetchImpl));
+  if (!jobs.length) return ['telegram not connected yet (dashboard pop-up only)'];
   const settled = await Promise.allSettled(jobs);
-  return settled.flatMap((s) => (s.status === 'fulfilled' ? s.value : [`alert error: ${s.reason?.message || s.reason}`]));
+  return settled.map((s) => (s.status === 'fulfilled' ? s.value : `alert failed: ${s.reason?.message || s.reason}`));
 }
 
 export function formatDropAlert(item) {
   const price = item.price ? ` $${item.price.toFixed(2)}` : '';
   const what = item.status === 'PREORDER' ? 'PREORDER OPEN' : 'IN STOCK';
   const over = item.maxPrice && item.price && item.price > item.maxPrice ? ` (over your $${item.maxPrice} cap)` : '';
-  return {
-    sms: `${what}: ${item.name} @ ${item.retailer}${price}${over}\n${item.url}`,
-    discord: `@here **${what}** — ${item.name} @ **${item.retailer}**${price}${over}\n${item.url}`,
-  };
+  return { text: `@here 🚨 **${what}** — ${item.name} @ **${item.retailer}**${price}${over}\n${item.url}` };
 }
+
+export const TEST_ALERT = { text: 'SYNDICATE.DROP test alert. If you can read this, drop alerts and daily briefs will land here.' };

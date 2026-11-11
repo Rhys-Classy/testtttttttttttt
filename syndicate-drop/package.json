@@ -2,11 +2,15 @@
   "name": "syndicate-drop",
   "version": "1.0.0",
   "private": true,
-  "description": "Pokemon TCG release and restock monitor with SMS and Discord alerts, in the SYNDICATE.OS theme.",
+  "description": "Pokemon TCG release and restock monitor with a Telegram update bot, in the SYNDICATE.OS theme.",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/server.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "build:exe": "node scripts/build-exe.mjs",
+    "build:linux": "node scripts/build-exe.mjs linux-x64"
   }
 }

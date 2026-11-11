@@ -88,7 +88,7 @@ export class Monitor {
 
       if (shouldAlert(item, r.status)) {
         item.lastAlertStatus = r.status;
-        const lines = await this.alert(formatDropAlert(item), this.fetchImpl);
+        const lines = await this.alert(formatDropAlert(item), this.store.state.settings, this.fetchImpl);
         this.store.state.alertsSent += 1;
         this.store.log('alert', item.retailer, `ALERT ${item.name} → ${lines.join(', ')}`);
       } else if (!BUYABLE.has(r.status) && r.status !== STATUS.BLOCKED && r.status !== STATUS.ERROR) {

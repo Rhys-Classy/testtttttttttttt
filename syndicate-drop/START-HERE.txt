@@ -1,0 +1,23 @@
+SYNDICATE.DROP — Pokemon TCG drop monitor
+==========================================
+
+1. Move this "SyndicateDrop" folder somewhere permanent (e.g. Documents).
+2. Double-click SyndicateDrop.exe.
+   - Windows may say "Windows protected your PC". Click "More info" then "Run anyway".
+     (It shows this for any program that isn't from a big publisher.)
+3. Your browser opens the dashboard. Press "CONNECT TELEGRAM" and follow the 3 steps.
+4. Paste product links into the WATCHLIST.
+
+Leave the black window open: closing it stops monitoring.
+Your watchlist and ledger are saved in the "SyndicateDrop-data" folder next to the program.
+
+Start it automatically with Windows:
+  Press Win+R, type  shell:startup  and press Enter.
+  Right-click SyndicateDrop.exe > Show more options > Create shortcut,
+  then drag the shortcut into the folder that opened.
+
+Stop the PC sleeping (or it can't watch overnight):
+  Settings > System > Power > Screen and sleep > "Make my device sleep after": Never (when plugged in).
+
+The dashboard only works on this computer (http://localhost:8080).
+Telegram is how you get alerts and updates on your phone.

@@ -25,8 +25,8 @@
     </div>
     <div class="top-right">
       <span class="sys" id="sys"><span class="dot"></span>SYS_ONLINE</span>
-      <button class="btn" id="notifyBtn" type="button">⚑ PHONE ALERTS</button>
-      <button class="btn" id="testBtn" type="button">⚡ TEST ALERT</button>
+      <button class="btn" id="notifyBtn" type="button">⚑ DESKTOP ALERTS</button>
+      <button class="btn cyan" id="settingsBtn" type="button">⚙ TELEGRAM BOT</button>
     </div>
   </header>
 
@@ -36,7 +36,7 @@
     <section class="stats">
       <div class="stat"><div class="label">WATCHING</div><div class="num cyan" id="sWatching">0</div><div class="caption">products on watch right now</div></div>
       <div class="stat"><div class="label">LIVE_NOW</div><div class="num acid" id="sLive">0</div><div class="caption">buyable this second</div></div>
-      <div class="stat"><div class="label">ALERTS_SENT</div><div class="num amber" id="sAlerts">0</div><div class="caption">sms and discord pings fired</div></div>
+      <div class="stat"><div class="label">ALERTS_SENT</div><div class="num amber" id="sAlerts">0</div><div class="caption">drop alerts sent to telegram</div></div>
       <div class="stat"><div class="label">NET_PROFIT</div><div class="num" id="sProfit">$0.00</div><div class="caption" id="sProfitCap">on sold stock, after fees</div></div>
     </section>
 
@@ -64,6 +64,9 @@
         <label class="f"><span class="label">RETAILER</span><input name="retailer" list="retailerList" placeholder="BIG W" maxlength="40"></label>
         <label class="f sm"><span class="label">QTY</span><input name="qty" type="number" min="1" max="999" value="1" required></label>
         <label class="f sm"><span class="label">COST_EACH_$</span><input name="unitCost" type="number" min="0" step="0.01" required></label>
+        <label class="f sm"><span class="label">STATUS</span><select name="orderStatus"><option>ORDERED</option><option>SHIPPED</option><option>DELIVERED</option></select></label>
+        <label class="f sm"><span class="label">ETA</span><input name="eta" type="date"></label>
+        <label class="f"><span class="label">TRACKING</span><input name="tracking" placeholder="optional" maxlength="80"></label>
         <button class="btn fill amber" type="submit">＋ LOG BUY</button>
       </form>
       <datalist id="retailerList"></datalist>
@@ -77,6 +80,42 @@
     <div class="feed" id="feed" aria-live="polite"></div>
   </section>
 </div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-labelledby="drawerTitle">
+  <div class="drawer-head"><h2 class="section" id="drawerTitle"><span>//</span> TELEGRAM BOT</h2><button class="btn" id="closeDrawer" type="button" aria-label="Close">✕</button></div>
+  <div class="drawer-body">
+    <div class="tg-status" id="tgStatus"></div>
+
+    <ol class="steps">
+      <li>In Telegram, search <b>@BotFather</b> and send <kbd>/newbot</kbd>. Name it anything, e.g. Syndicate Drop.</li>
+      <li>BotFather replies with a token. Copy it and paste it below.</li>
+      <li>Open your new bot and press <b>Start</b>. It replies "Connected".</li>
+    </ol>
+    <form id="tgForm" class="stack" autocomplete="off">
+      <label class="f"><span class="label">BOT_TOKEN</span><input name="telegramToken" type="password" placeholder="123456789:AA…" spellcheck="false"></label>
+      <button class="btn fill cyan" type="submit">▶ CONNECT BOT</button>
+    </form>
+
+    <form id="briefForm" class="stack" autocomplete="off">
+      <div class="label">DAILY_BRIEF</div>
+      <p class="caption">releases in the next 14 days, live stock, orders on the way, unsold stock and profit. plus a reminder the evening before and the morning of each release.</p>
+      <div class="row-inline">
+        <label class="f sm"><span class="label">SEND_AT</span><input name="briefTime" type="time" value="08:00"></label>
+        <label class="check"><input name="briefEnabled" type="checkbox" checked> ON</label>
+        <button class="btn" type="submit">SAVE</button>
+        <button class="btn acid" id="briefNow" type="button">↗ SEND NOW</button>
+      </div>
+    </form>
+
+    <form id="discordForm" class="stack" autocomplete="off">
+      <div class="label">DISCORD (OPTIONAL)</div>
+      <label class="f"><span class="label">WEBHOOK_URL</span><input name="discordWebhook" type="password" placeholder="https://discord.com/api/webhooks/…" spellcheck="false"></label>
+      <div class="row-inline"><button class="btn" type="submit">SAVE</button><button class="btn" id="testBtn" type="button">⚡ TEST ALERT</button></div>
+    </form>
+    <p class="formerr" id="setErr" role="alert"></p>
+  </div>
+</aside>
 
 <script src="/app.js"></script>
 </body>

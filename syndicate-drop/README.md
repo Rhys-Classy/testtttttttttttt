@@ -1,73 +1,70 @@
 # SYNDICATE.DROP
 
-Pokémon TCG release and restock monitor for Australian retailers, in the SYNDICATE.OS theme.
-It watches product pages, texts you and posts to Discord the moment one can be bought, and
-keeps a buy/sell ledger so you can see real profit.
-
-It does **not** check out for you, and it does not try to get past retailer bot protection.
-Retailers cancel bot orders and enforce per-customer limits; the winning setup is a fast alert
-plus a saved account and payment on each retailer, so you check out by hand in about 20 seconds.
+A downloadable Pokémon TCG drop monitor for Australian retailers, in the SYNDICATE.OS theme.
+It runs on your own PC, watches product pages, and has a Telegram bot that keeps you updated.
+No paid services.
 
 ```
-watchlist ─► monitor (each page every 15–60s) ─► stock goes live ─► SMS + Discord + dashboard beep
-                                                                         │
-                                                         you tap BUY NOW, check out by hand
-                                                                         │
-                                                                 log the buy in the ledger
+SyndicateDrop.exe on your PC
+  ├─ monitor: checks each product page every 15–60s
+  ├─ Telegram bot ─► drop alerts (instant)
+  │                ─► daily brief: releases in 14 days · live stock · orders on the way · unsold stock · profit
+  │                ─► reminders: evening before release, and release morning
+  │                ─► order updates: shipped / delivered
+  │                ◄─ /brief /upcoming /orders /live
+  └─ dashboard (http://localhost:8080): watchlist · ledger · settings
 ```
 
-## What works where
+It does **not** check out for you and does not try to get past retailer bot protection. Retailers
+cancel bot orders and enforce per-customer limits. The winning setup is a fast alert plus a saved
+account and card on each retailer, so you check out by hand in about 20 seconds.
 
-Checked from a cloud server on 11 Nov 2026:
+## Get it running (Windows)
 
-| Retailer | From a cloud server | Notes |
-|---|---|---|
-| Target, JB Hi-Fi, Amazon AU | Works | |
-| Big W, EB Games, Kmart, Toymate | Blocked (403/429) | Run the monitor from a home internet connection instead (see below) |
-| Pokémon Center AU | Expect blocked | Uses a queue system on big drops |
+1. Download `SyndicateDrop-Windows.zip`, unzip it somewhere permanent.
+2. Double-click `SyndicateDrop.exe`. If Windows says "protected your PC": More info → Run anyway.
+3. The dashboard opens and shows the Telegram setup:
+   - Telegram → search **@BotFather** → `/newbot` → copy the token → paste it → **CONNECT BOT**
+   - Open your new bot and press **Start**
+4. Paste product links into the watchlist, with release dates.
 
-The dashboard shows `BLOCKED` per retailer, so you always know which ones are actually covered.
+`START HERE.txt` in the zip also covers starting automatically with Windows and stopping the PC sleeping.
 
-## Run it
+## Why a home PC
 
-Needs Node 20 or newer. No packages to install.
+Big W, EB Games, Kmart and Toymate block requests from cloud servers (checked 11 Nov 2026).
+From a home internet connection, they treat the monitor like any visitor. If a page still shows
+`BLOCKED`, the monitor backs off for 5 minutes and the daily brief lists it.
 
-```
-cd syndicate-drop
-DASH_PASSWORD=pick-one npm start      # http://localhost:8080, any username
-npm test
-```
+## Telegram commands
 
-### Settings (environment variables)
-
-| Name | What |
+| Command | Reply |
 |---|---|
-| `DASH_PASSWORD` | Password for the dashboard. Leave empty only on your own computer. |
-| `DATA_DIR` | Where the watchlist and ledger are saved. Default `./data`. |
-| `DISCORD_WEBHOOK_URL` | Discord: channel settings → Integrations → Webhooks → New Webhook → Copy URL. |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | From the Twilio console. |
-| `TWILIO_FROM` | Your Twilio number, e.g. `+61400000000`. |
-| `ALERT_SMS_TO` | Your mobile number(s), comma-separated, e.g. `+61412345678`. |
+| `/brief` | The full daily brief now |
+| `/upcoming` | Releases in the next 14 days |
+| `/orders` | Orders on the way, with ETA, tracking and overdue flags |
+| `/live` | What's buyable right now, with links |
 
-### Deploy on Render (hands-off, covers Target, JB Hi-Fi and Amazon)
+The bot only answers the chat that pressed Start first. Everyone else is ignored.
 
-New → Blueprint → pick this repo. It reads `render.yaml`: Starter plan (about US$7 a month) plus a
-1 GB disk. Fill in the Discord and Twilio values when asked. The dashboard password is generated;
-find it under the service's Environment tab.
+## Ledger
 
-### Run at home (covers Big W, EB Games and Kmart too)
+Log each buy with status (ORDERED / SHIPPED / DELIVERED), ETA and tracking. Press 🚚 SHIPPED and
+📦 DELIVERED as it moves; each change pings Telegram. Press **SOLD** with sale price and fees to see
+real profit. Orders past their ETA show as OVERDUE in the brief.
 
-Any always-on Windows PC, Mac or mini PC on your home internet: install Node, then `npm start`
-in this folder. Same dashboard at `http://localhost:8080`.
+## Developers
 
-## Using it
+Node 20+; no runtime dependencies.
 
-1. Open the product page on the retailer's site (pre-release pages usually exist a week or two out).
-2. Paste the link, name it, set the release date and how often to check (30s is fine; 15s minimum).
-3. Press **TEST ALERT** once to confirm SMS and Discord arrive.
-4. Before each drop: log in to each retailer, save your address and card.
-5. When the phone buzzes, tap the link and check out.
-6. Log the buy in the ledger. When it sells, press **SOLD** and enter price and fees.
+```
+npm start              # run from source (data in ./data)
+npm test               # 19 tests
+npm run build:exe      # dist/SyndicateDrop-Windows.zip (needs nodejs.org, npm, zip/unzip)
+npm run build:linux    # dist/build/SyndicateDrop for testing
+```
 
-If a page reads `UNKNOWN`, add text that only shows when it's in stock (or out) to the item. That
-part is in the API (`inStockText`, `outOfStockText`) and not yet on the form.
+Env overrides: `PORT` (default 8080), `DATA_DIR`, `NO_BROWSER=1`, `DASH_PASSWORD`. The dashboard
+listens on 127.0.0.1 only.
+
+See `WHOLESALE.md` for sourcing at cost.
