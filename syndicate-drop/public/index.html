@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SYNDICATE.DROP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="crt">
+<div class="vignette"></div>
+
+<div class="boot" id="boot" aria-hidden="true">
+  <div class="boot-lines" id="bootLines"></div>
+</div>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <span class="logo">S/</span>
+      <span class="wordmark">SYNDICATE<span class="os">.OS</span></span>
+      <span class="crumb">// DROP DESK // POKEMON TCG // AU</span>
+    </div>
+    <div class="top-right">
+      <span class="sys" id="sys"><span class="dot"></span>SYS_ONLINE</span>
+      <button class="btn" id="notifyBtn" type="button">⚑ PHONE ALERTS</button>
+      <button class="btn" id="testBtn" type="button">⚡ TEST ALERT</button>
+    </div>
+  </header>
+
+  <div class="strip hatch" id="liveStrip" hidden></div>
+
+  <main class="grid-floor">
+    <section class="stats">
+      <div class="stat"><div class="label">WATCHING</div><div class="num cyan" id="sWatching">0</div><div class="caption">products on watch right now</div></div>
+      <div class="stat"><div class="label">LIVE_NOW</div><div class="num acid" id="sLive">0</div><div class="caption">buyable this second</div></div>
+      <div class="stat"><div class="label">ALERTS_SENT</div><div class="num amber" id="sAlerts">0</div><div class="caption">sms and discord pings fired</div></div>
+      <div class="stat"><div class="label">NET_PROFIT</div><div class="num" id="sProfit">$0.00</div><div class="caption" id="sProfitCap">on sold stock, after fees</div></div>
+    </section>
+
+    <section class="ops" id="ops"></section>
+
+    <section class="panel">
+      <div class="panel-head"><h2 class="section"><span>//</span> WATCHLIST</h2><span class="caption">paste a product page link. it is checked every few seconds and you get pinged the moment it can be bought.</span></div>
+      <form class="add" id="addForm" autocomplete="off">
+        <label class="f wide"><span class="label">PRODUCT_URL</span><input name="url" type="url" required placeholder="https://www.bigw.com.au/product/..."></label>
+        <label class="f"><span class="label">NAME</span><input name="name" required placeholder="Ascended Heroes ETB" maxlength="140"></label>
+        <label class="f"><span class="label">TYPE</span><select name="kind" id="kindSel"></select></label>
+        <label class="f sm"><span class="label">RELEASE</span><input name="releaseDate" type="date"></label>
+        <label class="f sm"><span class="label">EVERY_SEC</span><input name="intervalSec" type="number" min="15" max="3600" value="30"></label>
+        <label class="f sm"><span class="label">MAX_$</span><input name="maxPrice" type="number" min="0" step="0.01" placeholder="optional"></label>
+        <button class="btn fill acid" type="submit">▶ WATCH</button>
+      </form>
+      <p class="formerr" id="addErr" role="alert"></p>
+      <div class="rows" id="items"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2 class="section"><span>//</span> LEDGER</h2><span class="caption">log what you bought. mark it sold to see real profit per item.</span></div>
+      <form class="add" id="buyForm" autocomplete="off">
+        <label class="f wide"><span class="label">ITEM</span><input name="itemName" required placeholder="Ascended Heroes ETB" maxlength="140"></label>
+        <label class="f"><span class="label">RETAILER</span><input name="retailer" list="retailerList" placeholder="BIG W" maxlength="40"></label>
+        <label class="f sm"><span class="label">QTY</span><input name="qty" type="number" min="1" max="999" value="1" required></label>
+        <label class="f sm"><span class="label">COST_EACH_$</span><input name="unitCost" type="number" min="0" step="0.01" required></label>
+        <button class="btn fill amber" type="submit">＋ LOG BUY</button>
+      </form>
+      <datalist id="retailerList"></datalist>
+      <p class="formerr" id="buyErr" role="alert"></p>
+      <div class="rows" id="buys"></div>
+    </section>
+  </main>
+
+  <section class="console">
+    <div class="console-head"><span class="section"><span>//</span> FEED</span><span class="caption" id="chanInfo"></span></div>
+    <div class="feed" id="feed" aria-live="polite"></div>
+  </section>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
