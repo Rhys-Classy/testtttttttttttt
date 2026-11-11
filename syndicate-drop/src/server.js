@@ -13,6 +13,7 @@ import { TelegramBot } from './telegram.js';
 import { Relay } from './relay.js';
 import { SEED_ITEMS } from './seed.js';
 import { createActions, UserError, KINDS } from './actions.js';
+import { selfInstall } from './install.js';
 
 // Packaged as a single .exe (Node SEA) the web files are embedded assets and
 // data sits in a folder next to the program. Run from source, both come from the repo.
@@ -25,6 +26,13 @@ const sea = (() => {
     return null;
   }
 })();
+if (sea && process.platform === 'win32' && process.env.SD_NO_INSTALL !== '1') {
+  try {
+    if (selfInstall()) process.exit(0);
+  } catch (e) {
+    console.error(`  Install step failed (${e.message}). Running from here instead.`);
+  }
+}
 const ROOT = sea ? path.dirname(process.execPath) : path.dirname(path.dirname(path.resolve(process.argv[1])));
 const PUBLIC = path.join(ROOT, 'public');
 const START_PORT = Number(process.env.PORT || 8080);
@@ -270,9 +278,24 @@ server.on('listening', () => {
   digest.start();
   bot.sync();
   relay.start();
+  if (process.env.SD_JUST_INSTALLED === '1') {
+    store.log('ok', 'SYSTEM', 'installed and running');
+    bot.notify('✅ SYNDICATE.DROP installed/updated and running on your PC. Your watchlist, orders and bot carried over. Send /help for commands.');
+  }
   if (process.env.NO_BROWSER !== '1') openBrowser(url);
 });
-server.listen(port, HOST);
+
+// One copy only: two would double every alert and fight over the Telegram bot.
+fetch(`http://127.0.0.1:${START_PORT}/healthz`, { signal: AbortSignal.timeout(1500) })
+  .then((r) => r.json())
+  .then((j) => {
+    if (j && j.ok && 'monitor' in j) {
+      console.log(`\n  SYNDICATE.DROP is already running. Opening it: http://localhost:${START_PORT}\n`);
+      if (process.env.NO_BROWSER !== '1') openBrowser(`http://localhost:${START_PORT}`);
+      setTimeout(() => process.exit(0), 1500);
+    } else server.listen(port, HOST);
+  })
+  .catch(() => server.listen(port, HOST));
 
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, () => {

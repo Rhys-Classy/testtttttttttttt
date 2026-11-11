@@ -230,3 +230,31 @@ test('relay: accepts known retailers, rejects junk, JB and duplicates', () => {
   assert.equal(parseRelayMessage(JSON.stringify({ url: 'https://www.kmart.com.au/product/x-1/' }), [{ url: 'https://www.kmart.com.au/product/x-1/' }]), null);
   assert.deepEqual(parseRelayMessage('{"note":"nothing new"}', []), { type: 'note', text: 'nothing new' });
 });
+
+import fsx from 'node:fs';
+import osx from 'node:os';
+import pathx from 'node:path';
+import { findDataDirs, newestDataDir, copyDir, installDir } from '../src/install.js';
+
+test('installer finds the newest existing data folder and copies it', () => {
+  const home = fsx.mkdtempSync(pathx.join(osx.tmpdir(), 'sdinst-'));
+  const mk = (rel, mtime) => {
+    const d = pathx.join(home, rel, 'SyndicateDrop-data');
+    fsx.mkdirSync(d, { recursive: true });
+    fsx.writeFileSync(pathx.join(d, 'state.json'), JSON.stringify({ rel }));
+    fsx.utimesSync(pathx.join(d, 'state.json'), mtime, mtime);
+    return d;
+  };
+  const older = mk('Documents/SyndicateDrop/SyndicateDrop', new Date(2026, 10, 1));
+  const newer = mk('Desktop/SyndicateDrop', new Date(2026, 10, 11));
+  fsx.mkdirSync(pathx.join(home, 'Documents/empty/SyndicateDrop-data'), { recursive: true }); // no state.json: ignored
+  mk('Documents/a/b/c/d/e/f', new Date(2026, 10, 12)); // too deep: ignored
+  const found = findDataDirs([pathx.join(home, 'Documents'), pathx.join(home, 'Desktop'), pathx.join(home, 'missing')]);
+  assert.deepEqual(found.sort(), [older, newer].sort());
+  assert.equal(newestDataDir(found), newer);
+  const dest = pathx.join(home, 'install', 'SyndicateDrop-data');
+  copyDir(newer, dest);
+  assert.deepEqual(JSON.parse(fsx.readFileSync(pathx.join(dest, 'state.json'), 'utf8')), { rel: 'Desktop/SyndicateDrop' });
+  assert.equal(installDir({ LOCALAPPDATA: 'C:\\Users\\R\\AppData\\Local' }).endsWith('SyndicateDrop'), true);
+  fsx.rmSync(home, { recursive: true, force: true });
+});

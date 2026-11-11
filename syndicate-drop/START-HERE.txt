@@ -1,23 +1,14 @@
 SYNDICATE.DROP — Pokemon TCG drop monitor
 ==========================================
 
-1. Move this "SyndicateDrop" folder somewhere permanent (e.g. Documents).
-2. Double-click SyndicateDrop.exe.
-   - Windows may say "Windows protected your PC". Click "More info" then "Run anyway".
-     (It shows this for any program that isn't from a big publisher.)
-3. Your browser opens the dashboard. Press "CONNECT TELEGRAM" and follow the 3 steps.
-4. Paste product links into the WATCHLIST.
+Double-click SyndicateDrop.exe. That's it — for a first install AND for every update.
 
-Leave the black window open: closing it stops monitoring.
-Your watchlist and ledger are saved in the "SyndicateDrop-data" folder next to the program.
+- Windows may say "Windows protected your PC". Click "More info" then "Run anyway".
+- It finds your existing watchlist, orders and Telegram bot, stops any old copy,
+  installs itself, sets itself to start with Windows, and restarts.
+- Your Telegram bot then says "installed/updated and running".
 
-Start it automatically with Windows:
-  Press Win+R, type  shell:startup  and press Enter.
-  Right-click SyndicateDrop.exe > Show more options > Create shortcut,
-  then drag the shortcut into the folder that opened.
+First install only: the dashboard opens; press CONNECT TELEGRAM and follow the 3 steps.
 
-Stop the PC sleeping (or it can't watch overnight):
-  Settings > System > Power > Screen and sleep > "Make my device sleep after": Never (when plugged in).
-
-The dashboard only works on this computer (http://localhost:8080).
-Telegram is how you get alerts and updates on your phone.
+After that, run everything from Telegram (send /help to your bot).
+Keep the PC on and awake (Settings > System > Power > sleep when plugged in: Never).
