@@ -152,3 +152,81 @@ test('release reminders: evening before from 6pm, and on the day', () => {
   const day = releaseReminders(s, new Date(2026, 10, 12, 7, 0).getTime());
   assert.deepEqual(day.map((r) => r.key), ['day:a:2026-11-12']);
 });
+
+import { createActions } from '../src/actions.js';
+import { parseRelayMessage } from '../src/relay.js';
+
+function fakeBotEnv() {
+  const sent = [];
+  const fake = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    sent.push({ method: url.split('/').pop(), body });
+    return { ok: true, json: async () => ({ ok: true, result: { message_id: 1 } }) };
+  };
+  const store = { state: { items: [], buys: [], log: [], settings: { telegramToken: 't', telegramChatId: '7' } }, log() {}, save() {} };
+  const actions = createActions({ store, monitor: null, alert: null });
+  const bot = new TelegramBot({ store, actions, monitor: { check: async () => {} }, fetchImpl: fake });
+  const say = (text) => bot.handle({ chat: { id: 7 }, text });
+  return { sent, store, bot, say, last: () => sent[sent.length - 1].body.text };
+}
+
+test('telegram: watch, list, pause and remove a product', async () => {
+  const { store, say, last } = fakeBotEnv();
+  await say('/watch https://www.target.com.au/p/flowing-fists-elite-trainer-box/12345 2027-02-05 $99');
+  assert.match(last(), /Watching #\w{4} Flowing Fists Elite Trainer Box @ TARGET, max \$99/);
+  const item = store.state.items[0];
+  assert.deepEqual([item.releaseDate, item.maxPrice], ['2027-02-05', 99]);
+  await say('/list');
+  assert.match(last(), new RegExp(`#${item.id.slice(0, 4)} Flowing Fists`));
+  await say(`/pause #${item.id.slice(0, 4)}`);
+  assert.equal(item.active, false);
+  await say(`/remove ${item.id.slice(0, 4)}`);
+  assert.equal(store.state.items.length, 0);
+});
+
+test('telegram: bad input gets a plain explanation, not a crash', async () => {
+  const { say, last } = fakeBotEnv();
+  await say('/watch not-a-link');
+  assert.match(last(), /^⚠ Paste the full product link/);
+  await say('/pause #zz');
+  assert.match(last(), /Give the #id/);
+  await say('/bought two');
+  assert.match(last(), /Send \/bought/);
+});
+
+test('telegram: order lifecycle bought → shipped → delivered → sold', async () => {
+  const { store, say, last } = fakeBotEnv();
+  await say('/bought 2 $89 Delta Reign ETB');
+  const buy = store.state.buys[0];
+  const id = buy.id.slice(0, 4);
+  await say(`/shipped #${id} 2026-11-20 AP123456`);
+  assert.deepEqual([buy.orderStatus, buy.eta, buy.tracking], ['SHIPPED', '2026-11-20', 'AP123456']);
+  await say(`/orders`);
+  assert.match(last(), /ON THE WAY\n#\w{4} 2 × Delta Reign ETB .* SHIPPED, ETA 2026-11-20, AP123456/);
+  await say(`/delivered #${id}`);
+  await say(`/sold #${id} 150 12`);
+  assert.match(last(), /Profit \+\$110\.00/);
+});
+
+test('telegram: scout suggestion WATCH button adds it; only the owner can press', async () => {
+  const { store, bot, sent } = fakeBotEnv();
+  await bot.suggest({ name: 'FF ETB', url: 'https://www.bigw.com.au/product/ff/p/1', retailer: 'BIG W', maxPrice: 99 });
+  const key = sent[0].body.reply_markup.inline_keyboard[0][0].callback_data;
+  await bot.handleButton({ id: 'q', data: key, message: { chat: { id: 99 }, message_id: 1, text: 'x' } });
+  assert.equal(store.state.items.length, 0, 'stranger cannot add');
+  await bot.handleButton({ id: 'q', data: key, message: { chat: { id: 7 }, message_id: 1, text: 'x' } });
+  assert.equal(store.state.items[0].url, 'https://www.bigw.com.au/product/ff/p/1');
+  assert.ok(sent.some((s) => s.method === 'editMessageText' && /Watching/.test(s.body.text)));
+});
+
+test('relay: accepts known retailers, rejects junk, JB and duplicates', () => {
+  const ok = parseRelayMessage(JSON.stringify({ name: 'FF ETB', url: 'https://www.kmart.com.au/product/x-1/', price: 99, releaseDate: '2027-02-05' }), []);
+  assert.equal(ok.type, 'suggest');
+  assert.deepEqual([ok.item.retailer, ok.item.maxPrice], ['KMART', 99]);
+  assert.equal(parseRelayMessage('{"url":"https://evil.example.com/x"}', []), null);
+  assert.equal(parseRelayMessage('{"url":"https://www.jbhifi.com.au/products/x"}', []), null);
+  assert.equal(parseRelayMessage('{"url":"http://www.kmart.com.au/x"}', []), null);
+  assert.equal(parseRelayMessage('not json', []), null);
+  assert.equal(parseRelayMessage(JSON.stringify({ url: 'https://www.kmart.com.au/product/x-1/' }), [{ url: 'https://www.kmart.com.au/product/x-1/' }]), null);
+  assert.deepEqual(parseRelayMessage('{"note":"nothing new"}', []), { type: 'note', text: 'nothing new' });
+});

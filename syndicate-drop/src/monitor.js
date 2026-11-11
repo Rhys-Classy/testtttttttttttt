@@ -86,6 +86,13 @@ export class Monitor {
         this.store.log(level, item.retailer, `${item.name}: ${prev || 'NEW'} → ${r.status}${extra}`);
       }
 
+      // Tell the owner once a day per product when a page can't be read.
+      if ((r.status === STATUS.BLOCKED || r.status === STATUS.ERROR) && prev !== r.status && item.lastChecked - (item.lastProblemAlert || 0) > 86400000) {
+        item.lastProblemAlert = item.lastChecked;
+        const why = r.status === STATUS.BLOCKED ? `the retailer refused the check (HTTP ${r.httpStatus}). Retrying every 5 min.` : `the page failed to load${r.httpStatus ? ` (HTTP ${r.httpStatus})` : ''}. Retrying.`;
+        this.alert({ text: `⚠ **${r.status}** — ${item.name} @ ${item.retailer}: ${why}` }, this.store.state.settings, this.fetchImpl);
+      }
+
       if (shouldAlert(item, r.status)) {
         item.lastAlertStatus = r.status;
         const lines = await this.alert(formatDropAlert(item), this.store.state.settings, this.fetchImpl);

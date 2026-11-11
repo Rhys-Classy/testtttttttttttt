@@ -18,7 +18,9 @@ fs.mkdirSync(BUILD, { recursive: true });
 
 // 1. One CommonJS file (SEA cannot load ES modules or other files).
 run('npx', ['--yes', 'esbuild@0.24.0', 'src/server.js', '--bundle', '--platform=node', '--format=cjs',
-  `--target=node${process.versions.node.split('.')[0]}`, `--outfile=${path.join(BUILD, 'app.cjs')}`, '--log-level=warning']);
+  `--target=node${process.versions.node.split('.')[0]}`, `--outfile=${path.join(BUILD, 'app.cjs')}`, '--log-level=warning',
+  // The owner's private scout relay topic. Never committed; pass SD_RELAY_TOPIC when building.
+  `--define:process.env.SD_RELAY_TOPIC=${JSON.stringify(process.env.SD_RELAY_TOPIC || '')}`]);
 
 // 2. The SEA blob, with the dashboard files embedded.
 const assets = Object.fromEntries(fs.readdirSync(path.join(ROOT, 'public')).map((f) => [f, path.join(ROOT, 'public', f)]));

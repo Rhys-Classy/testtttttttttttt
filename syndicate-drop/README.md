@@ -37,14 +37,28 @@ From a home internet connection, they treat the monitor like any visitor.
 JB Hi-Fi loads stock after the page opens, so its pages read `UNKNOWN`; Target, Kmart, Big W, EB Games and Amazon AU publish stock in the page itself. If a page still shows
 `BLOCKED`, the monitor backs off for 5 minutes and the daily brief lists it.
 
-## Telegram commands
+## Telegram: run everything from your phone
 
-| Command | Reply |
+| Command | Does |
 |---|---|
-| `/brief` | The full daily brief now |
-| `/upcoming` | Releases in the next 14 days |
-| `/orders` | Orders on the way, with ETA, tracking and overdue flags |
-| `/live` | What's buyable right now, with links |
+| `/brief` `/upcoming` `/live` `/orders` | Updates on demand |
+| `/list` | Watchlist with short #ids |
+| `/watch <link> [YYYY-MM-DD] [max$]` | Watch a product page |
+| `/calendar <YYYY-MM-DD> <name>` | Release date only (reminders, brief) |
+| `/check` `/pause` `/resume` `/remove` `#id` | Manage a watched product |
+| `/bought <qty> <$each> <name>` | Log a buy |
+| `/shipped #id [eta] [tracking]` · `/delivered #id` · `/sold #id <$each> [fees$]` | Move an order along |
+
+Also sent to Telegram: drop alerts, the daily brief, release reminders, order changes made on the
+dashboard, a once-a-day notice when a product page is blocked or broken, and scout finds.
+
+## Pre-order scout
+
+A scheduled cloud task searches Australian retailers twice a week for new pre-order pages and posts
+them to a private ntfy.sh topic (free, no account). The program checks that topic every 5 minutes and
+sends each find to Telegram with **➕ WATCH** / **✕ SKIP** buttons. Only known retailer links are
+accepted, nothing is added without your tap, and the topic name is baked in at build time
+(`SD_RELAY_TOPIC=… npm run build:exe`), never committed.
 
 The bot only answers the chat that pressed Start first. Everyone else is ignored.
 
@@ -60,7 +74,7 @@ Node 20+; no runtime dependencies.
 
 ```
 npm start              # run from source (data in ./data)
-npm test               # 19 tests
+npm test               # 24 tests
 npm run build:exe      # dist/SyndicateDrop-Windows.zip (needs nodejs.org, npm, zip/unzip)
 npm run build:linux    # dist/build/SyndicateDrop for testing
 ```

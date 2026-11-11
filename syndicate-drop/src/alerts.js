@@ -25,11 +25,12 @@ export async function telegramCall(token, method, params, fetchImpl = fetch, tim
   return body.result;
 }
 
-export async function sendTelegram(settings, text, fetchImpl = fetch) {
-  await telegramCall(settings.telegramToken, 'sendMessage', {
+export async function sendTelegram(settings, text, fetchImpl = fetch, extra = {}) {
+  return telegramCall(settings.telegramToken, 'sendMessage', {
     chat_id: settings.telegramChatId,
     text: toPlain(text).slice(0, 4000),
     disable_web_page_preview: true,
+    ...extra,
   }, fetchImpl);
 }
 

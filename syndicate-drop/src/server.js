@@ -6,11 +6,13 @@ import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { Store, newId } from './store.js';
 import { Monitor, MIN_INTERVAL_SEC } from './monitor.js';
-import { retailerOf, KNOWN_RETAILERS, BUYABLE } from './detect.js';
+import { KNOWN_RETAILERS, BUYABLE } from './detect.js';
 import { alertChannels, sendAlert, telegramCall, TEST_ALERT } from './alerts.js';
 import { Digest } from './digest.js';
 import { TelegramBot } from './telegram.js';
+import { Relay } from './relay.js';
 import { SEED_ITEMS } from './seed.js';
+import { createActions, UserError, KINDS } from './actions.js';
 
 // Packaged as a single .exe (Node SEA) the web files are embedded assets and
 // data sits in a folder next to the program. Run from source, both come from the repo.
@@ -28,9 +30,19 @@ const PUBLIC = path.join(ROOT, 'public');
 const START_PORT = Number(process.env.PORT || 8080);
 const HOST = process.env.HOST || '127.0.0.1';
 const PASSWORD = process.env.DASH_PASSWORD || '';
-const KINDS = ['ETB', 'BOOSTER_BOX', 'BOOSTER_BUNDLE', 'COLLECTION', 'TIN', 'OTHER'];
 
 const store = new Store(process.env.DATA_DIR || path.join(ROOT, sea ? 'SyndicateDrop-data' : 'data'));
+const monitor = new Monitor({ store });
+const actions = createActions({ store, monitor, alert: sendAlert });
+const digest = new Digest({ store, alert: sendAlert });
+const bot = new TelegramBot({ store, actions, monitor });
+const relay = new Relay({ store, bot });
+
+if (store.fresh) {
+  for (const s of SEED_ITEMS) store.state.items.push(actions.makeItem(s));
+  store.log('info', 'SYSTEM', `first run: loaded ${SEED_ITEMS.length} upcoming releases and product pages`);
+  store.flush();
+}
 
 function readPublic(file) {
   if (sea) {
@@ -59,14 +71,9 @@ function publicSettings() {
     discordSet: Boolean(s.discordWebhook),
     briefTime: s.briefTime || '08:00',
     briefEnabled: s.briefEnabled !== false,
+    scoutLinked: Boolean(relay.topic),
   };
 }
-const monitor = new Monitor({ store });
-const digest = new Digest({ store, alert: sendAlert });
-const bot = new TelegramBot({ store });
-const ORDER_STATUSES = ['ORDERED', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
-
-class BadRequest extends Error {}
 
 function authorised(req) {
   if (!PASSWORD) return true;
@@ -87,72 +94,13 @@ async function readJson(req) {
   let raw = '';
   for await (const chunk of req) {
     raw += chunk;
-    if (raw.length > 50_000) throw new BadRequest('That request is too large.');
+    if (raw.length > 50_000) throw new UserError('That request is too large.');
   }
   try {
     return raw ? JSON.parse(raw) : {};
   } catch {
-    throw new BadRequest('That request was not valid JSON.');
+    throw new UserError('That request was not valid JSON.');
   }
-}
-
-function cleanText(v, max = 140) {
-  return typeof v === 'string' ? v.trim().slice(0, max) : '';
-}
-
-function toCents(v, field) {
-  if (v === '' || v === null || v === undefined) return null;
-  const n = Number(v);
-  if (!Number.isFinite(n) || n < 0) throw new BadRequest(`${field} must be a dollar amount.`);
-  return Math.round(n * 100);
-}
-
-function checkProductUrl(raw) {
-  let u;
-  try {
-    u = new URL(String(raw).trim());
-  } catch {
-    throw new BadRequest('Paste the full product link, starting with https://');
-  }
-  if (u.protocol !== 'https:') throw new BadRequest('Product links must start with https://');
-  if (!u.hostname.includes('.') || /^[\d.]+$/.test(u.hostname) || u.hostname.includes(':')) {
-    throw new BadRequest('That does not look like a shop website.');
-  }
-  return u.toString();
-}
-
-/** A watched product (with a link) or a calendar entry (date only). */
-function makeItem(b) {
-  const releaseDate = /^\d{4}-\d{2}-\d{2}$/.test(b.releaseDate || '') ? b.releaseDate : null;
-  const rawUrl = String(b.url || '').trim();
-  if (!rawUrl && !releaseDate) throw new BadRequest('Paste a product link, or give a release date to add it to the calendar.');
-  const url = rawUrl ? checkProductUrl(rawUrl) : null;
-  if (url && store.state.items.some((i) => i.url === url)) throw new BadRequest('That product is already on the watchlist.');
-  return {
-    id: newId(),
-    name: cleanText(b.name) || 'Unnamed product',
-    url,
-    retailer: url ? retailerOf(url) : 'CALENDAR',
-    kind: KINDS.includes(b.kind) ? b.kind : 'OTHER',
-    releaseDate,
-    intervalSec: Math.max(MIN_INTERVAL_SEC, Math.min(3600, Number(b.intervalSec) || 30)),
-    maxPrice: b.maxPrice ? Number(b.maxPrice) || null : null,
-    inStockText: cleanText(b.inStockText, 80) || null,
-    outOfStockText: cleanText(b.outOfStockText, 80) || null,
-    active: true,
-    status: null,
-    price: null,
-    lastChecked: null,
-    lastChange: null,
-    lastAlertStatus: null,
-    addedAt: Date.now(),
-  };
-}
-
-if (store.fresh) {
-  for (const s of SEED_ITEMS) store.state.items.push(makeItem(s));
-  store.log('info', 'SYSTEM', `first run: loaded ${SEED_ITEMS.length} upcoming releases and product pages`);
-  store.flush();
 }
 
 function stats() {
@@ -167,7 +115,7 @@ function stats() {
     else unsoldCost += cost;
   }
   return {
-    watching: items.filter((i) => i.active !== false).length,
+    watching: items.filter((i) => i.active !== false && i.url).length,
     live: items.filter((i) => BUYABLE.has(i.status)).length,
     blocked: items.filter((i) => i.status === 'BLOCKED').length,
     alertsSent,
@@ -196,19 +144,19 @@ const routes = {
     if ('discordWebhook' in b) {
       const v = String(b.discordWebhook || '').trim();
       if (v && !/^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+$/.test(v)) {
-        throw new BadRequest('That is not a Discord webhook link. It should start with https://discord.com/api/webhooks/');
+        throw new UserError('That is not a Discord webhook link. It should start with https://discord.com/api/webhooks/');
       }
       s.discordWebhook = v || null;
     }
     if ('telegramToken' in b) {
       const v = String(b.telegramToken || '').trim();
       if (v && v !== s.telegramToken) {
-        if (!/^\d{5,15}:[\w-]{30,60}$/.test(v)) throw new BadRequest('That is not a Telegram bot token. BotFather sends one that looks like 123456789:AA…');
+        if (!/^\d{5,15}:[\w-]{30,60}$/.test(v)) throw new UserError('That is not a Telegram bot token. BotFather sends one that looks like 123456789:AA…');
         let me;
         try {
           me = await telegramCall(v, 'getMe', {});
         } catch (e) {
-          throw new BadRequest(`Telegram rejected that token (${e.message}). Copy it again from BotFather.`);
+          throw new UserError(`Telegram rejected that token (${e.message}). Copy it again from BotFather.`);
         }
         s.telegramToken = v;
         s.telegramBotName = me.username;
@@ -221,7 +169,7 @@ const routes = {
       bot.sync();
     }
     if ('briefTime' in b) {
-      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(b.briefTime || '')) throw new BadRequest('Brief time must look like 08:00.');
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(b.briefTime || '')) throw new UserError('Brief time must look like 08:00.');
       s.briefTime = b.briefTime;
     }
     if ('briefEnabled' in b) s.briefEnabled = Boolean(b.briefEnabled);
@@ -231,65 +179,25 @@ const routes = {
   },
 
   'POST /api/brief': async () => ({ lines: await digest.sendBrief() }),
-
-  'POST /api/items': async (req) => {
-    const item = makeItem(await readJson(req));
-    store.state.items.push(item);
-    store.log('info', 'OPERATOR', item.url ? `watching ${item.name} @ ${item.retailer}` : `added ${item.name} to the calendar`);
-    store.save();
-    if (item.url) monitor.check(item);
-    return item;
-  },
-
+  'POST /api/items': async (req) => actions.addItem(await readJson(req)),
+  'POST /api/buys': async (req) => actions.addBuy(await readJson(req)),
   'POST /api/test-alert': async () => {
     const lines = await sendAlert(TEST_ALERT, store.state.settings);
     store.log('alert', 'OPERATOR', `test alert → ${lines.join(', ')}`);
     return { lines };
   },
-
-  'POST /api/buys': async (req) => {
-    const b = await readJson(req);
-    const qty = Math.round(Number(b.qty));
-    if (!Number.isFinite(qty) || qty < 1 || qty > 999) throw new BadRequest('Quantity must be between 1 and 999.');
-    const unitCost = toCents(b.unitCost, 'Unit cost');
-    if (unitCost === null) throw new BadRequest('Enter what you paid for each one.');
-    const buy = {
-      id: newId(),
-      itemName: cleanText(b.itemName) || 'Unnamed product',
-      retailer: cleanText(b.retailer, 40) || 'UNKNOWN',
-      qty,
-      unitCost,
-      soldUnitPrice: toCents(b.soldUnitPrice, 'Sold price'),
-      fees: toCents(b.fees, 'Fees') || 0,
-      orderStatus: ORDER_STATUSES.includes(b.orderStatus) ? b.orderStatus : 'ORDERED',
-      eta: /^\d{4}-\d{2}-\d{2}$/.test(b.eta || '') ? b.eta : null,
-      tracking: cleanText(b.tracking, 80) || null,
-      date: new Date().toISOString().slice(0, 10),
-    };
-    store.state.buys.unshift(buy);
-    store.log('info', 'LEDGER', `bought ${qty} × ${buy.itemName} at $${(unitCost / 100).toFixed(2)}`);
-    store.save();
-    return buy;
-  },
 };
 
 const itemRoutes = {
   DELETE: (item) => {
-    store.state.items = store.state.items.filter((i) => i !== item);
-    store.log('info', 'OPERATOR', `stopped watching ${item.name}`);
-    store.save();
+    actions.removeItem(item);
     return { ok: true };
   },
   'POST check': async (item) => {
     await monitor.check(item);
     return item;
   },
-  'POST toggle': (item) => {
-    item.active = item.active === false;
-    store.log('info', 'OPERATOR', `${item.active ? 'resumed' : 'paused'} ${item.name}`);
-    store.save();
-    return item;
-  },
+  'POST toggle': (item) => actions.setActive(item, item.active === false),
 };
 
 async function handle(req, res) {
@@ -326,32 +234,10 @@ async function handle(req, res) {
     const buy = store.state.buys.find((b) => b.id === m[1]);
     if (!buy) return send(res, 404, { error: 'That ledger entry no longer exists.' });
     if (req.method === 'DELETE') {
-      store.state.buys = store.state.buys.filter((b) => b !== buy);
-      store.save();
+      actions.removeBuy(buy);
       return send(res, 200, { ok: true });
     }
-    if (req.method === 'PATCH') {
-      const b = await readJson(req);
-      if ('soldUnitPrice' in b) {
-        buy.soldUnitPrice = toCents(b.soldUnitPrice, 'Sold price');
-        if (buy.soldUnitPrice !== null) store.log('ok', 'LEDGER', `sold ${buy.qty} × ${buy.itemName} at $${(buy.soldUnitPrice / 100).toFixed(2)}`);
-      }
-      if ('fees' in b) buy.fees = toCents(b.fees, 'Fees') || 0;
-      if ('eta' in b) buy.eta = /^\d{4}-\d{2}-\d{2}$/.test(b.eta || '') ? b.eta : null;
-      if ('tracking' in b) buy.tracking = cleanText(b.tracking, 80) || null;
-      if ('orderStatus' in b) {
-        if (!ORDER_STATUSES.includes(b.orderStatus)) throw new BadRequest('Unknown order status.');
-        if (b.orderStatus !== buy.orderStatus) {
-          buy.orderStatus = b.orderStatus;
-          const icon = { SHIPPED: '🚚', DELIVERED: '📦', CANCELLED: '✕', ORDERED: '🧾' }[b.orderStatus];
-          const msg = `${icon} **${b.orderStatus}** — ${buy.qty} × ${buy.itemName} (${buy.retailer})${buy.eta && b.orderStatus === 'SHIPPED' ? `, ETA ${buy.eta}` : ''}${buy.tracking ? `, tracking ${buy.tracking}` : ''}`;
-          store.log('info', 'LEDGER', msg.replace(/\*\*/g, ''));
-          sendAlert({ text: msg }, store.state.settings);
-        }
-      }
-      store.save();
-      return send(res, 200, buy);
-    }
+    if (req.method === 'PATCH') return send(res, 200, actions.updateBuy(buy, await readJson(req)));
   }
 
   send(res, 404, { error: 'Not found.' });
@@ -359,7 +245,7 @@ async function handle(req, res) {
 
 const server = http.createServer((req, res) => {
   handle(req, res).catch((e) => {
-    if (e instanceof BadRequest) return send(res, 400, { error: e.message });
+    if (e instanceof UserError) return send(res, 400, { error: e.message });
     const ref = newId();
     console.error(`[${ref}]`, e);
     send(res, 500, { error: `Something went wrong (ref ${ref}).` });
@@ -383,6 +269,7 @@ server.on('listening', () => {
   monitor.start();
   digest.start();
   bot.sync();
+  relay.start();
   if (process.env.NO_BROWSER !== '1') openBrowser(url);
 });
 server.listen(port, HOST);
@@ -392,6 +279,7 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     monitor.stop();
     digest.stop();
     bot.stop();
+    relay.stop();
     store.flush();
     process.exit(0);
   });
